@@ -1,10 +1,22 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-URL_BD = "postgresql://emilianofaro:postgres@localhost/barberia"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_engine(URL_BD)
-SesionLocal = sessionmaker(bind=engine)
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL no está configurada")
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True
+)
+
+SesionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
 
 def get_db():
     db = SesionLocal()
