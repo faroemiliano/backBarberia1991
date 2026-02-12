@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import os
 load_dotenv()
-
+print(os.getenv("ADMIN_EMAIL"))
 from database import engine
 from models import Base
 
