@@ -7,13 +7,13 @@ print(os.getenv("ADMIN_EMAIL"))
 from database import engine
 from models import Base
 
-from routers import auth, calendario, admin, auth_google, admin_servicios
+from routers import auth, calendario, admin, auth_google, admin_servicios, debug
 
 
 app = FastAPI(title="Barbería API")
 
 # =====================
-# BASE DE DATOS
+# BASE DE DATOS 
 # =====================
 Base.metadata.create_all(bind=engine)
 
@@ -40,3 +40,4 @@ app.include_router(calendario.router, prefix="", tags=["Calendario"])
 app.include_router(admin.router, prefix="/admin", tags=["Admin"])
 app.include_router(auth_google.router)
 app.include_router(admin_servicios.router)
+app.include_router(debug.router)
