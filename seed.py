@@ -8,7 +8,7 @@ from models import Usuario, Servicio, Turno
 # =====================
 # CONFIG
 # =====================
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@barberia.com")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "faroemiliano@gmail.com")
 ADMIN_NAME = "Administrador"
 SERVICIOS_PREDEFINIDOS = [
     {"nombre": "Corte de cabello", "precio": 1500},

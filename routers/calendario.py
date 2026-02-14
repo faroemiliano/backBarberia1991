@@ -82,6 +82,56 @@ def preparar_calendario(db: Session = Depends(get_db)):
     return {"ok": True, "horarios_creados": creados}
 
 # --------------------------------------------------
+# GENERAR TODO EL AÑO (UNA SOLA VEZ)
+# --------------------------------------------------
+
+@router.post("/preparar-servicios")
+def preparar_servicios(db: Session = Depends(get_db)):
+
+    servicios_base = [
+        {"nombre": "Corte", "precio": 15000},
+        {"nombre": "Corte + Barba", "precio": 17000},
+        {"nombre": "Barba", "precio": 13000},
+        {"nombre": "Corte + Tintura", "precio": 800},
+    ]
+
+    creados = 0
+    actualizados = 0
+    reactivados = 0
+
+    for s in servicios_base:
+        servicio = db.query(Servicio).filter(Servicio.nombre == s["nombre"]).first()
+
+        # NO EXISTE → CREAR
+        if not servicio:
+            db.add(Servicio(
+                nombre=s["nombre"],
+                precio=s["precio"],
+                activo=True
+            ))
+            creados += 1
+            continue
+
+        # EXISTE PERO ESTABA DESACTIVADO → REACTIVAR
+        if not servicio.activo:
+            servicio.activo = True
+            reactivados += 1
+
+        # EXISTE PERO CAMBIÓ PRECIO → ACTUALIZAR
+        if servicio.precio != s["precio"]:
+            servicio.precio = s["precio"]
+            actualizados += 1
+
+    db.commit()
+
+    return {
+        "ok": True,
+        "creados": creados,
+        "actualizados": actualizados,
+        "reactivados": reactivados
+    }
+
+# --------------------------------------------------
 # RESERVAR TURNO
 # --------------------------------------------------
 @router.post("/reservar")
