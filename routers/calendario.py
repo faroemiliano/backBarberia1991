@@ -201,13 +201,16 @@ def reservar(
     db.refresh(turno)
 
     # 8️⃣ Email
-    enviar_email_confirmacion(
-        destino=usuario.email,
-        nombre=usuario.nombre,
-        fecha=horario.fecha.strftime("%d/%m/%Y"),
-        hora=horario.hora.strftime("%H:%M"),
-        servicio=servicio.nombre
+    try:
+        enviar_email_confirmacion(
+            destino=usuario.email,
+            nombre=usuario.nombre,
+            fecha=horario.fecha.strftime("%d/%m/%Y"),
+            hora=horario.hora.strftime("%H:%M"),
+            servicio=servicio.nombre
     )
+    except Exception as e:
+        print("⚠️ Error enviando email:", e)
 
     return {
         "ok": True,
