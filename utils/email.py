@@ -37,22 +37,22 @@ def enviar_email(destino, asunto, texto, html=None):
 
     EMAIL_TEST = os.getenv("EMAIL_TEST")
 
+    real_destino = destino
+
+    # modo prueba: todo llega a vos
     if EMAIL_TEST:
-        print(f"[TEST MODE] Email real: {destino} -> redirigido a {EMAIL_TEST}")
         destino = EMAIL_TEST
-        from_email = f"Barberia <{EMAIL_TEST}>"
-    else:
-        from_email = "Barberia <onboarding@resend.dev>"
+        print(f"[TEST MODE] {real_destino} -> {destino}")
 
     contenido_html = html if html else f"<pre>{texto}</pre>"
 
     resend.Emails.send({
-        "from": from_email,
+        "from": "Barberia <onboarding@resend.dev>",
         "to": [destino],
+        "reply_to": real_destino,   # 👈 clave
         "subject": asunto,
         "html": contenido_html
     })
-
 # =========================================================
 # CONFIRMACION
 # =========================================================
