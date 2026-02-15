@@ -1,39 +1,32 @@
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import os
+import resend
+
+resend.api_key = os.getenv("RESEND_API_KEY")
 
 
+# =========================================================
+# FUNCION BASE (reemplaza SMTP)
+# =========================================================
 def enviar_email(destino, asunto, texto, html=None):
-    SMTP_HOST = os.getenv("SMTP_HOST")
-    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_USER = os.getenv("SMTP_USER")
-    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
-    if not all([SMTP_HOST, SMTP_USER, SMTP_PASSWORD]):
-        raise Exception("Configuración SMTP incompleta")
+    if not resend.api_key:
+        raise Exception("RESEND_API_KEY no configurada")
 
-    msg = MIMEMultipart("alternative")
-    msg["From"] = SMTP_USER
-    msg["To"] = destino
-    msg["Subject"] = asunto
+    contenido_html = html if html else f"<pre>{texto}</pre>"
 
-    msg.attach(MIMEText(texto, "plain", "utf-8"))
-
-    if html:
-        msg.attach(MIMEText(html, "html", "utf-8"))
-
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-        server.ehlo()
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.send_message(msg)
+    resend.Emails.send({
+        "from": "Barberia <onboarding@resend.dev>",
+        "to": [destino],
+        "subject": asunto,
+        "html": contenido_html
+    })
 
 
-# ----------------------------------
-# CONFIRMACIÓN
-# ----------------------------------
+# =========================================================
+# CONFIRMACION
+# =========================================================
 def enviar_email_confirmacion(destino, nombre, fecha, hora, servicio):
+
     texto = f"""
 Hola {nombre},
 
@@ -47,36 +40,27 @@ Te esperamos 💈
 """
 
     html = f"""
-<html>
-  <body style="font-family: Arial; color: #222;">
-    <h2>¡Gracias por tu reserva! 🙌</h2>
+<h2>¡Gracias por tu reserva! 🙌</h2>
+<p>Tu turno fue confirmado correctamente.</p>
 
-    <p>Tu turno fue confirmado correctamente.</p>
+<ul>
+<li><b>📅 Día:</b> {fecha}</li>
+<li><b>⏰ Horario:</b> {hora}</li>
+<li><b>✂️ Servicio:</b> {servicio}</li>
+</ul>
 
-    <ul>
-      <li><strong>📅 Día:</strong> {fecha}</li>
-      <li><strong>⏰ Horario:</strong> {hora}</li>
-      <li><strong>✂️ Servicio:</strong> {servicio}</li>
-    </ul>
-
-    <p style="margin-top:20px;">¡Te esperamos!</p>
-    <p>💈 Barbería</p>
-  </body>
-</html>
+<p>¡Te esperamos!</p>
+<p>💈 Barbería</p>
 """
 
-    enviar_email(
-        destino=destino,
-        asunto="✅ Confirmación de tu turno",
-        texto=texto,
-        html=html
-    )
+    enviar_email(destino, "✅ Confirmación de tu turno", texto, html)
 
 
-# ----------------------------------
-# CANCELACIÓN
-# ----------------------------------
+# =========================================================
+# CANCELACION
+# =========================================================
 def enviar_email_cancelacion(destino, nombre, fecha, hora, servicio):
+
     texto = f"""
 Hola {nombre},
 
@@ -92,16 +76,12 @@ Saludos,
 Barbería 💈
 """
 
-    enviar_email(
-        destino=destino,
-        asunto="❌ Turno cancelado – Barbería",
-        texto=texto
-    )
+    enviar_email(destino, "❌ Turno cancelado – Barbería", texto)
 
 
-# ----------------------------------
-# EDICIÓN
-# ----------------------------------
+# =========================================================
+# EDICION
+# =========================================================
 def enviar_email_edicion(
     destino,
     nombre,
@@ -112,6 +92,7 @@ def enviar_email_edicion(
     servicio_anterior,
     servicio_nuevo
 ):
+
     texto = f"""
 Hola {nombre},
 
@@ -127,14 +108,8 @@ Ahora:
 ⏰ {hora_nueva.strftime('%H:%M')}
 ✂️ {servicio_nuevo}
 
-Si tenés alguna consulta, comunicate con la barbería.
-
 Saludos,
 Barbería 💈
 """
 
-    enviar_email(
-        destino=destino,
-        asunto="✏️ Tu turno fue modificado",
-        texto=texto
-    )
+    enviar_email(destino, "✏️ Tu turno fue modificado", texto)
