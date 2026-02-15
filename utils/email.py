@@ -1,25 +1,35 @@
 import os
 import resend
 
-resend.api_key = os.getenv("RESEND_API_KEY")
-
 
 # =========================================================
-# FUNCION BASE (reemplaza SMTP)
+# FUNCION BASE (segura, nunca rompe el servidor)
 # =========================================================
 def enviar_email(destino, asunto, texto, html=None):
 
-    if not resend.api_key:
-        raise Exception("RESEND_API_KEY no configurada")
+    api_key = os.getenv("RESEND_API_KEY")
 
-    contenido_html = html if html else f"<pre>{texto}</pre>"
+    if not api_key:
+        print("⚠️ Email desactivado: RESEND_API_KEY no configurada")
+        return  # no rompe la app
 
-    resend.Emails.send({
-        "from": "Barberia <onboarding@resend.dev>",
-        "to": [destino],
-        "subject": asunto,
-        "html": contenido_html
-    })
+    try:
+        resend.api_key = api_key
+
+        contenido_html = html if html else f"<pre>{texto}</pre>"
+
+        resend.Emails.send({
+            "from": "Barberia <onboarding@resend.dev>",
+            "to": [destino],
+            "subject": asunto,
+            "html": contenido_html
+        })
+
+        print("✅ Email enviado correctamente")
+
+    except Exception as e:
+        # Nunca dejar que el email rompa la request principal
+        print("❌ Error enviando email:", str(e))
 
 
 # =========================================================
