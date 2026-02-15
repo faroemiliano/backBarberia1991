@@ -5,32 +5,53 @@ import resend
 # =========================================================
 # FUNCION BASE (segura, nunca rompe el servidor)
 # =========================================================
+# def enviar_email(destino, asunto, texto, html=None):
+
+#     api_key = os.getenv("RESEND_API_KEY")
+
+#     if not api_key:
+#         print("⚠️ Email desactivado: RESEND_API_KEY no configurada")
+#         return  # no rompe la app
+
+#     try:
+#         resend.api_key = api_key
+
+#         contenido_html = html if html else f"<pre>{texto}</pre>"
+
+#         resend.Emails.send({
+#             "from": "Barberia <onboarding@resend.dev>",
+#             "to": [destino],
+#             "subject": asunto,
+#             "html": contenido_html
+#         })
+
+#         print("✅ Email enviado correctamente")
+
+#     except Exception as e:
+#         # Nunca dejar que el email rompa la request principal
+#         print("❌ Error enviando email:", str(e))
 def enviar_email(destino, asunto, texto, html=None):
 
-    api_key = os.getenv("RESEND_API_KEY")
+    if not resend.api_key:
+        raise Exception("RESEND_API_KEY no configurada")
 
-    if not api_key:
-        print("⚠️ Email desactivado: RESEND_API_KEY no configurada")
-        return  # no rompe la app
+    EMAIL_TEST = os.getenv("EMAIL_TEST")
 
-    try:
-        resend.api_key = api_key
+    if EMAIL_TEST:
+        print(f"[TEST MODE] Email real: {destino} -> redirigido a {EMAIL_TEST}")
+        destino = EMAIL_TEST
+        from_email = f"Barberia <{EMAIL_TEST}>"
+    else:
+        from_email = "Barberia <onboarding@resend.dev>"
 
-        contenido_html = html if html else f"<pre>{texto}</pre>"
+    contenido_html = html if html else f"<pre>{texto}</pre>"
 
-        resend.Emails.send({
-            "from": "Barberia <onboarding@resend.dev>",
-            "to": [destino],
-            "subject": asunto,
-            "html": contenido_html
-        })
-
-        print("✅ Email enviado correctamente")
-
-    except Exception as e:
-        # Nunca dejar que el email rompa la request principal
-        print("❌ Error enviando email:", str(e))
-
+    resend.Emails.send({
+        "from": from_email,
+        "to": [destino],
+        "subject": asunto,
+        "html": contenido_html
+    })
 
 # =========================================================
 # CONFIRMACION
