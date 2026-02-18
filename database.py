@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-
+print("🔹 Database URL:", DATABASE_URL)
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL no está configurada")
 
