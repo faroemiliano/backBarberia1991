@@ -5,7 +5,7 @@ from models import Turno, Horario, Servicio
 from auth.deps import admin_required
 from utils.email import enviar_email_cancelacion
 from utils.email import enviar_email_edicion
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from sqlalchemy import func
 from schemas import EditarTurno
 from database import get_db
@@ -234,105 +234,105 @@ def calendario_admin(
 
 @router.get("/ganancias")
 def ver_ganancias(
-    tipo: str = Query(..., regex="^(dia|semana|mes)$"),
+    tipo: str,
+    fecha: str | None = None,
+    mes: str | None = None,
     db: Session = Depends(get_db),
     user=Depends(admin_required),
 ):
-    hoy = date.today()
-
     if tipo == "dia":
-        inicio = hoy
-        fin = hoy
+        dia = date.fromisoformat(fecha)
 
-    elif tipo == "semana":
-        inicio = hoy - timedelta(days=hoy.weekday())
-        fin = inicio + timedelta(days=6)
+        print("---- TURNOS EN DB ----")
+        turnos = db.query(Turno).limit(20).all()
+        for t in turnos:
+            print("turno:", t.id, "horario_id:", t.horario_id, "precio:", t.precio)
 
-    else:  # mes
-        inicio = hoy.replace(day=1)
-        if inicio.month == 12:
-            fin = inicio.replace(year=inicio.year + 1, month=1, day=1) - timedelta(days=1)
-        else:
-            fin = inicio.replace(month=inicio.month + 1, day=1) - timedelta(days=1)
+        print("---- HORARIOS ----")
+        horarios = db.query(Horario).limit(20).all()
+        for h in horarios:
+            print("horario:", h.id, "fecha:", h.fecha)
+        total = (
+            db.query(func.coalesce(func.sum(Turno.precio), 0))
+            .join(Turno.horario)
+            .filter(Horario.fecha == dia)
+            .scalar()
+        )
 
-    total = (
-        db.query(func.coalesce(func.sum(Turno.precio), 0))
-        .join(Horario)
-        .filter(Horario.fecha.between(inicio, fin))
-        .scalar()
-    )
+    elif tipo == "mes":
+        y, m = map(int, mes.split("-"))
 
-    return {
-        "tipo": tipo,
-        "desde": inicio.isoformat(),
-        "hasta": fin.isoformat(),
-        "total": total,
-    }
+        total = (
+            db.query(func.coalesce(func.sum(Turno.precio), 0))
+            .join(Turno.horario)
+            .filter(
+                func.extract("year", Horario.fecha) == y,
+                func.extract("month", Horario.fecha) == m,
+            )
+            .scalar()
+        )
 
+    else:
+        total = 0
 
+    return {"total": float(total)}
 
 @router.get("/ganancias/grafico")
 def ganancias_grafico(
-    tipo: str = "dia",
-    fecha: str = None,  # <-- nuevo parámetro para tipo "dia"
-    mes: str = None,
-    db: Session = Depends(get_db)
+    tipo: str,
+    fecha: str | None = None,
+    mes: str | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(admin_required),
 ):
-    """
-    Devuelve ganancias para gráfico de torta agrupadas por servicio.
-    tipo: "dia", "semana", "mes"
-    fecha: "YYYY-MM-DD" para tipo=dia
-    mes: "YYYY-MM" para tipo=mes
-    """
-    hoy = date.today()
-
     if tipo == "dia":
-        if fecha:
-            start = end = date.fromisoformat(fecha)
-        else:
-            start = end = hoy
-    elif tipo == "semana":
-        if fecha:
-            d = date.fromisoformat(fecha)
-        else:
-            d = hoy
-        start = d - timedelta(days=d.weekday())
-        end = start + timedelta(days=6)
-    elif tipo == "mes":
-        if mes:  # ej: "2026-02"
-            y, m = map(int, mes.split("-"))
-            start = date(y, m, 1)
-        else:
-            start = date(hoy.year, hoy.month, 1)
-        # último día del mes
-        if start.month == 12:
-            end = date(start.year + 1, 1, 1) - timedelta(days=1)
-        else:
-            end = date(start.year, start.month + 1, 1) - timedelta(days=1)
-    else:
-        return {"error": "tipo inválido"}
+        dia = date.fromisoformat(fecha)
 
-    resultados = (
-        db.query(
-            Servicio.nombre.label("servicio"),
-            func.sum(Turno.precio).label("total")
+        resultados = (
+            db.query(
+                Servicio.nombre.label("servicio"),
+                func.sum(Turno.precio).label("total")
+            )
+            .join(Turno.servicio)
+            .join(Turno.horario)
+            .filter(Horario.fecha == dia)
+            .group_by(Servicio.nombre)
+            .all()
         )
-        .join(Turno.servicio)
-        .join(Turno.horario)
-        .filter(Turno.horario.has(Horario.fecha.between(start, end)))
-        .group_by(Servicio.nombre)
-        .all()
-    )
 
-    return [{"servicio": r.servicio, "total": r.total} for r in resultados]
+    elif tipo == "mes":
+        y, m = map(int, mes.split("-"))
+
+        resultados = (
+            db.query(
+                Servicio.nombre.label("servicio"),
+                func.sum(Turno.precio).label("total")
+            )
+            .join(Turno.servicio)
+            .join(Turno.horario)
+            .filter(
+                func.extract("year", Horario.fecha) == y,
+                func.extract("month", Horario.fecha) == m,
+            )
+            .group_by(Servicio.nombre)
+            .all()
+        )
+    else:
+        return []
+
+    return [{"servicio": r.servicio, "total": float(r.total)} for r in resultados]
 
 @router.get("/ganancias/detalle")
 def detalle_ganancias(
     fecha: str,
-    servicio: str = None,  # opcional
+    servicio: str = None,
     db: Session = Depends(get_db),
     user=Depends(admin_required),
 ):
+    base = date.fromisoformat(fecha)
+    inicio = base
+    fin = base + timedelta(days=1)
+
     query = (
         db.query(
             Turno.nombre,
@@ -341,20 +341,80 @@ def detalle_ganancias(
         )
         .join(Turno.servicio)
         .join(Turno.horario)
-        .filter(Horario.fecha == date.fromisoformat(fecha))
+        .filter(Horario.fecha >= inicio, Horario.fecha < fin)
     )
 
-    # solo filtrar si se pasó un servicio
     if servicio:
         query = query.filter(Servicio.nombre == servicio)
 
     resultados = query.all()
 
     return [
+        {"nombre": r.nombre, "servicio": r.servicio, "precio": r.precio}
+        for r in resultados
+    ]
+@router.get("/estadisticas/dia")
+def clientes_por_dia(
+    fecha: str,
+    db: Session = Depends(get_db),
+    user=Depends(admin_required),
+):
+    fecha_date = date.fromisoformat(fecha)
+
+    total = (
+        db.query(func.count(Turno.id))
+        .join(Turno.horario)
+        .filter(Horario.fecha == fecha_date)
+        .scalar()
+    )
+
+    return {
+        "fecha": fecha,
+        "total_clientes": total
+    }
+
+# =========================
+# RESUMEN MENSUAL (CALENDARIO)
+# =========================
+@router.get("/estadisticas/mes")
+def resumen_mes(
+    anio: int,
+    mes: int,
+    db: Session = Depends(get_db),
+    user=Depends(admin_required),
+):
+    resultados = (
+        db.query(
+            Horario.fecha.label("fecha"),
+            func.count(Turno.id).label("clientes"),
+            func.coalesce(func.sum(Turno.precio), 0).label("total")
+        )
+        .outerjoin(Turno, Turno.horario_id == Horario.id)
+        .filter(
+            func.extract("year", Horario.fecha) == anio,
+            func.extract("month", Horario.fecha) == mes,
+        )
+        .group_by(Horario.fecha)
+        .order_by(Horario.fecha)
+        .all()
+    )
+
+    dias = [
         {
-            "nombre": r.nombre,
-            "servicio": r.servicio,
-            "precio": r.precio,
+            "fecha": r.fecha.isoformat(),
+            "clientes": r.clientes,
+            "ganancia": float(r.total),
         }
         for r in resultados
     ]
+
+    total_mes = sum(d["ganancia"] for d in dias)
+    clientes_mes = sum(d["clientes"] for d in dias)
+
+    return {
+        "anio": anio,
+        "mes": mes,
+        "clientes_mes": clientes_mes,
+        "ganancia_mes": total_mes,
+        "dias": dias
+    }
