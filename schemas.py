@@ -6,3 +6,12 @@ class EditarTurno(BaseModel):
     servicio_id: Optional[int] = None
     telefono: Optional[str] = None
     precio: Optional[float] = None
+
+class HorarioOut(BaseModel):
+    id: int
+    fecha: str  # ISO format
+    hora: str   # HH:MM
+    disponible: bool
+
+    class Config:
+        orm_mode = True     

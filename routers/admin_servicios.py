@@ -5,10 +5,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Servicio
 
-router = APIRouter(
-    prefix="/admin/servicios",
-    tags=["Admin - Servicios"],
-)
+router = APIRouter(prefix="/admin/servicios", tags=["Admin"])
 
 @router.get("")
 def listar_servicios(db: Session = Depends(get_db)):

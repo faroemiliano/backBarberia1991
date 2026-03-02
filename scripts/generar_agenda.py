@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 load_dotenv()  # <-- esto lee tu .env
 from datetime import date, datetime, time, timedelta
 from database import SesionLocal
-from models import Horario, HorarioBase, Turno
+from models import Horario, HorarioBase, RolEnum, Turno, Usuario
 
 # ========================
 # CONFIG
@@ -24,7 +24,6 @@ DIAS = {
 def dia_espanol(fecha: date):
     return DIAS[fecha.strftime("%A").lower()]
 
-# franjas por día
 FRANJAS = {
     "martes":   [(time(11,0), time(14,0)), (time(15,0), time(20,0))],
     "miercoles":[(time(11,0), time(14,0)), (time(15,0), time(20,0))],
@@ -33,50 +32,74 @@ FRANJAS = {
     "sabado":   [(time(10,0), time(14,0)), (time(15,0), time(20,0))],
 }
 
-INTERVALO = 30  # minutos
-
-# ========================
-# RUN
-# ========================
+INTERVALO = 30
 
 db = SesionLocal()
 
+# ========================
 # 0️⃣ BORRAR TODO
+# ========================
+
 print("🗑 Borrando turnos y horarios antiguos...")
 db.query(Turno).delete()
 db.query(Horario).delete()
 db.query(HorarioBase).delete()
 db.commit()
 
+# ========================
 # 1️⃣ GENERAR HORARIOS BASE
+# ========================
+
 print("📅 Generando horarios base...")
+
 for dia, franjas in FRANJAS.items():
     for inicio, fin in franjas:
-        hora = inicio
-        while hora < fin:
+        hora_actual = inicio
+
+        while hora_actual < fin:
             db.add(HorarioBase(
                 dia_semana=dia,
-                hora=hora
+                hora=hora_actual
             ))
-            # sumar intervalo
-            hora = (datetime.combine(date.today(), hora) + timedelta(minutes=INTERVALO)).time()
+
+            hora_actual = (
+                datetime.combine(date.today(), hora_actual)
+                + timedelta(minutes=INTERVALO)
+            ).time()
+
 db.commit()
 
-# 2️⃣ GENERAR HORARIOS REALES (1 año)
-print("⏳ Generando horarios reales para 1 año...")
+# ========================
+# 2️⃣ GENERAR HORARIOS POR BARBERO (1 AÑO)
+# ========================
+
+print("⏳ Generando horarios reales por barbero...")
+
 hoy = date.today()
 
-for i in range(365):
-    fecha = hoy + timedelta(days=i)
-    dia = dia_espanol(fecha)
-    bases = db.query(HorarioBase).filter_by(dia_semana=dia).all()
-    for base in bases:
-        db.add(Horario(
-            fecha=fecha,
-            hora=base.hora,
-            disponible=True
-        ))
+# 🔥 SOLO usuarios con rol barbero
+barberos = db.query(Usuario).filter(
+    Usuario.rol == RolEnum.barbero
+).all()
+
+for barbero in barberos:
+    for i in range(365):
+        fecha = hoy + timedelta(days=i)
+        dia = dia_espanol(fecha)
+
+        bases = db.query(HorarioBase).filter_by(
+            dia_semana=dia
+        ).all()
+
+        for base in bases:
+            db.add(Horario(
+                fecha=fecha,
+                hora=base.hora,
+                disponible=True,
+                barbero_id=barbero.id  # 🔥 CLAVE
+            ))
 
 db.commit()
 db.close()
-print("✅ Agenda generada correctamente")
+
+print("✅ Agenda generada correctamente para todos los barberos")

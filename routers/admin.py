@@ -40,6 +40,7 @@ def ver_turnos(
             "hora": t.horario.hora.strftime("%H:%M"),
             "servicio": t.servicio.nombre,
             "precio": t.precio,  # ✅ AGREGADO
+            "barbero": t.barbero.nombre if t.barbero else None,
         }
         for t in turnos
     ]
@@ -211,13 +212,15 @@ def toggle_horario(
         "disponible": horario.disponible,
     }
 
-@router.get("/calendario")
+@router.get("/calendario-admin/{barbero_id}")
 def calendario_admin(
+    barbero_id: int,
     db: Session = Depends(get_db),
     user=Depends(admin_required),
 ):
     horarios = (
         db.query(Horario)
+        .filter(Horario.barbero_id == barbero_id)
         .order_by(Horario.fecha, Horario.hora)
         .all()
     )

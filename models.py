@@ -1,23 +1,22 @@
 from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    Boolean,
-    Date,
-    Time,
-    ForeignKey,
-    UniqueConstraint,
-    Index,
-    Float,
+    Column, Integer, String, Boolean, Date, Time, ForeignKey, UniqueConstraint, Index, Float, Enum
 )
+import enum
 from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
 
 # ======================
-# USUARIOS
+# ENUM ROL
 # ======================
+class RolEnum(enum.Enum):
+    admin = "admin"
+    cliente = "cliente"
+    barbero = "barbero"
 
+# ======================
+# USUARIO
+# ======================
 class Usuario(Base):
     __tablename__ = "usuarios"
 
@@ -25,21 +24,30 @@ class Usuario(Base):
     nombre = Column(String(100), unique=True, nullable=False)
     email = Column(String(150), unique=True, nullable=False, index=True)
     password = Column(String, nullable=True)
-    is_admin = Column(Boolean, nullable=False, default=False)
+    rol = Column(Enum(RolEnum), nullable=False, default=RolEnum.cliente)
 
+    # Turnos como cliente
     turnos = relationship(
         "Turno",
         back_populates="usuario",
         cascade="all, delete-orphan",
+        foreign_keys="Turno.usuario_id"
+    )
+
+    # Turnos como barbero
+    turnos_barbero = relationship(
+        "Turno",
+        back_populates="barbero",
+        cascade="all, delete-orphan",
+        foreign_keys="Turno.barbero_id"
     )
 
     def __repr__(self):
-        return f"<Usuario {self.id} {self.email}>"
+        return f"<Usuario {self.id} {self.email} {self.rol}>"
 
 # ======================
 # HORARIOS BASE
 # ======================
-
 class HorarioBase(Base):
     __tablename__ = "horarios_base"
 
@@ -57,7 +65,6 @@ class HorarioBase(Base):
 # ======================
 # HORARIOS (CALENDARIO)
 # ======================
-
 class Horario(Base):
     __tablename__ = "horarios"
 
@@ -66,6 +73,8 @@ class Horario(Base):
     hora = Column(Time, nullable=False)
     disponible = Column(Boolean, nullable=False, default=True)
 
+    barbero_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+
     turno = relationship(
         "Turno",
         back_populates="horario",
@@ -73,18 +82,16 @@ class Horario(Base):
         cascade="all, delete-orphan",
     )
 
+    barbero = relationship("Usuario")
+
     __table_args__ = (
-        UniqueConstraint("fecha", "hora", name="uq_fecha_hora"),
+        UniqueConstraint("fecha", "hora", "barbero_id", name="uq_fecha_hora_barbero"),
         Index("ix_fecha_disponible", "fecha", "disponible"),
     )
-
-    def __repr__(self):
-        return f"<Horario {self.fecha} {self.hora} disp={self.disponible}>"
 
 # ======================
 # SERVICIOS
 # ======================
-
 class Servicio(Base):
     __tablename__ = "servicios"
 
@@ -104,40 +111,24 @@ class Servicio(Base):
 # ======================
 # TURNOS
 # ======================
-
 class Turno(Base):
     __tablename__ = "turnos"
 
     id = Column(Integer, primary_key=True)
-
     nombre = Column(String(100), nullable=False)
     telefono = Column(String(30), nullable=False)
 
-    horario_id = Column(
-        Integer,
-        ForeignKey("horarios.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
-    )
+    horario_id = Column(Integer, ForeignKey("horarios.id", ondelete="CASCADE"), nullable=False, unique=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    barbero_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    servicio_id = Column(Integer, ForeignKey("servicios.id"), nullable=False)
 
-    usuario_id = Column(
-        Integer,
-        ForeignKey("usuarios.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-
-    servicio_id = Column(
-        Integer,
-        ForeignKey("servicios.id"),
-        nullable=False,
-    )
-
-    # snapshot del precio al momento del turno
     precio = Column(Float, nullable=False)
 
     horario = relationship("Horario", back_populates="turno")
-    usuario = relationship("Usuario", back_populates="turnos")
+    usuario = relationship("Usuario", back_populates="turnos", foreign_keys=[usuario_id])
+    barbero = relationship("Usuario", back_populates="turnos_barbero", foreign_keys=[barbero_id])
     servicio = relationship("Servicio", back_populates="turnos")
 
     def __repr__(self):
-        return f"<Turno {self.id} horario={self.horario_id}>"
+        return f"<Turno {self.id} horario={self.horario_id} usuario={self.usuario_id} barbero={self.barbero_id}>"
