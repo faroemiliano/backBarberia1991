@@ -59,8 +59,10 @@ print("✅ Horarios base generados/validados")
 
 hoy = date.today()
 barberos = db.query(Usuario).filter(
-    Usuario.rol.in_([RolEnum.barbero.value, RolEnum.admin.value])
+    Usuario.rol.in_(["barbero", "admin"])
 ).all()
+
+nuevos = []
 
 for barbero in barberos:
     for i in range(365):
@@ -68,18 +70,18 @@ for barbero in barberos:
         dia = dia_espanol(fecha)
 
         bases = db.query(HorarioBase).filter_by(dia_semana=dia).all()
+
         for base in bases:
-            exists = db.query(Horario).filter_by(
-                fecha=fecha, hora=base.hora, barbero_id=barbero.id
-            ).first()
-            if not exists:
-                db.add(Horario(
+            nuevos.append(
+                Horario(
                     fecha=fecha,
                     hora=base.hora,
                     disponible=True,
                     barbero_id=barbero.id
-                ))
+                )
+            )
 
+db.bulk_save_objects(nuevos)
 db.commit()
 db.close()
 print("✅ Horarios generados para todos los barberos actuales")
