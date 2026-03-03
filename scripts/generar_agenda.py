@@ -1,6 +1,7 @@
 import sys
 import os
 from dotenv import load_dotenv
+from sqlalchemy.dialects.postgresql import insert
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 load_dotenv()
 
@@ -58,9 +59,19 @@ print("✅ Horarios base generados/validados")
 # ========================
 
 hoy = date.today()
+
 barberos = db.query(Usuario).filter(
     Usuario.rol.in_([RolEnum.barbero, RolEnum.admin])
 ).all()
+
+print("🔢 Cantidad barberos:", len(barberos))
+
+# 🔥 Traemos todos los horarios base UNA sola vez
+bases_por_dia = {}
+
+todas_bases = db.query(HorarioBase).all()
+for base in todas_bases:
+    bases_por_dia.setdefault(base.dia_semana, []).append(base)
 
 nuevos = []
 
@@ -69,7 +80,7 @@ for barbero in barberos:
         fecha = hoy + timedelta(days=i)
         dia = dia_espanol(fecha)
 
-        bases = db.query(HorarioBase).filter_by(dia_semana=dia).all()
+        bases = bases_por_dia.get(dia, [])
 
         for base in bases:
             nuevos.append(
@@ -81,7 +92,24 @@ for barbero in barberos:
                 )
             )
 
-db.bulk_save_objects(nuevos)
+print("🧮 Cantidad de horarios a insertar:", len(nuevos))
+
+stmt = insert(Horario).values([
+    {
+        "fecha": h.fecha,
+        "hora": h.hora,
+        "disponible": h.disponible,
+        "barbero_id": h.barbero_id,
+    }
+    for h in nuevos
+])
+
+stmt = stmt.on_conflict_do_nothing(
+    index_elements=["fecha", "hora", "barbero_id"]
+)
+
+db.execute(stmt)
 db.commit()
 db.close()
+
 print("✅ Horarios generados para todos los barberos actuales")
