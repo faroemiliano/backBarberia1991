@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Boolean, Date, Time, ForeignKey, UniqueConstraint, Index, Float, Enum
+    Column, Integer, String, Boolean, Date, Time, ForeignKey, UniqueConstraint, Index, Float, Enum, text
 )
 import enum
 from sqlalchemy.orm import relationship, declarative_base
@@ -24,7 +24,11 @@ class Usuario(Base):
     nombre = Column(String(100), unique=True, nullable=False)
     email = Column(String(150), unique=True, nullable=False, index=True)
     password = Column(String, nullable=True)
-    rol = Column(Enum(RolEnum), nullable=False, default=RolEnum.cliente)
+    rol = Column(
+    Enum(RolEnum),
+    nullable=False,
+    server_default=text("'cliente'")
+)
 
     # Turnos como cliente
     turnos = relationship(
