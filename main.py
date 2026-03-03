@@ -8,11 +8,28 @@ print(os.getenv("ADMIN_EMAIL"))
 from database import engine
 from models import Base
 
-from routers import auth, calendario, admin, auth_google, admin_servicios
-
+# Routers
+from routers import admin_barberos, auth, barbero_solo, calendario, admin, auth_google, admin_servicios, mis_turnos
 
 app = FastAPI(title="Barbería API")
 
+# =====================
+# RESET SOLO EN DESARROLLO
+# =====================
+RESET_DB = False  # ⚠️ poner False en producción
+
+if RESET_DB:
+    print("⚠️ Borrando tablas...")
+    Base.metadata.drop_all(bind=engine)
+    print("✅ Tablas eliminadas")
+
+print("📦 Creando tablas...")
+Base.metadata.create_all(bind=engine)
+print("✅ Tablas creadas")
+
+# =====================
+# OPENAPI / JWT
+# =====================
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
@@ -39,16 +56,11 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 # =====================
-# BASE DE DATOS 
-# =====================
-Base.metadata.create_all(bind=engine)
-
-# =====================
 # CORS
 # =====================
 app.add_middleware(
     CORSMiddleware,
-   allow_origins=[
+    allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://front-barberia1991.vercel.app",
@@ -61,8 +73,24 @@ app.add_middleware(
 # =====================
 # ROUTERS
 # =====================
+# Auth / Google / Registro
 app.include_router(auth.router, prefix="", tags=["Auth"])
+app.include_router(auth_google.router, prefix="", tags=["Auth Google"])
+
+# Calendario y mis turnos (usuario normal)
 app.include_router(calendario.router, prefix="", tags=["Calendario"])
-app.include_router(admin.router, prefix="/admin", tags=["Admin"])
-app.include_router(auth_google.router)
+app.include_router(mis_turnos.router, prefix="", tags=["Turnos Usuario"])
 app.include_router(admin_servicios.router)
+
+# =====================
+# ADMIN ROUTER
+# =====================
+# Todas las rutas que usan admin_required o admin.is_admin
+app.include_router(admin.router, prefix="/admin", tags=["Admin"])
+app.include_router(admin_barberos.router, prefix="/admin", tags=["Admin"])
+
+# =====================
+# BARBERO ROUTER
+# =====================
+# Solo rutas de barbero (ej: /panel-barbero)
+app.include_router(barbero_solo.router, prefix="", tags=["Barbero"])

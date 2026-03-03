@@ -3,7 +3,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from sqlalchemy.orm import Session
 from database import SesionLocal
-from models import Usuario
+from models import RolEnum, Usuario
 from auth.security import create_token
 from database import get_db
 
@@ -36,7 +36,7 @@ def login_google(payload: dict, db: Session = Depends(get_db)):
             user = Usuario(
                 nombre=nombre,
                 email=email,
-                is_admin=email == ADMIN_EMAIL
+                rol=RolEnum.admin if email == ADMIN_EMAIL else RolEnum.cliente
             )
             db.add(user)
             db.commit()
@@ -44,7 +44,8 @@ def login_google(payload: dict, db: Session = Depends(get_db)):
 
         jwt = create_token({
             "sub": str(user.id),
-            "is_admin": user.is_admin
+            "rol": user.rol.value  # guardamos el rol en el token
+
         })
 
         return {
@@ -53,7 +54,7 @@ def login_google(payload: dict, db: Session = Depends(get_db)):
                 "id": user.id,
                 "nombre": user.nombre,
                 "email": user.email,
-                "is_admin": user.is_admin
+                "rol": user.rol.value
             }
         }
 
