@@ -56,7 +56,15 @@ def enviar_email(destino, asunto, texto, html=None):
 # =========================================================
 # CONFIRMACION
 # =========================================================
-def enviar_email_confirmacion(destino, nombre, fecha, hora, servicio):
+def enviar_email_confirmacion(
+    destino,
+    nombre,
+    fecha,
+    hora,
+    servicio,
+    precio,
+    barbero
+):
 
     texto = f"""
 Hola {nombre},
@@ -66,6 +74,8 @@ Gracias por reservar tu turno 🙌
 📅 Día: {fecha}
 ⏰ Horario: {hora}
 ✂️ Servicio: {servicio}
+💈 Barbero: {barbero}
+💲 Precio: ${precio}
 
 Te esperamos 💈
 """
@@ -78,6 +88,8 @@ Te esperamos 💈
 <li><b>📅 Día:</b> {fecha}</li>
 <li><b>⏰ Horario:</b> {hora}</li>
 <li><b>✂️ Servicio:</b> {servicio}</li>
+<li><b>💈 Barbero:</b> {barbero}</li>
+<li><b>💲 Precio:</b> ${precio}</li>
 </ul>
 
 <p>¡Te esperamos!</p>
@@ -85,8 +97,6 @@ Te esperamos 💈
 """
 
     enviar_email(destino, "✅ Confirmación de tu turno", texto, html)
-
-
 # =========================================================
 # CANCELACION
 # =========================================================

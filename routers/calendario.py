@@ -1,3 +1,5 @@
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from database import SesionLocal
@@ -194,65 +196,77 @@ def preparar_servicios(db: Session = Depends(get_db)):
 # --------------------------------------------------
 # RESERVAR TURNO
 # --------------------------------------------------
+ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
+
 @router.post("/reservar")
 def reservar(
     data: SolicitudTurno,
     db: Session = Depends(get_db),
     authorization: str = Header(...)
 ):
-    # 1️⃣ Validar header Authorization
+    # 1️⃣ Validar Authorization
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Token mal formado")
 
     token = authorization.replace("Bearer ", "").strip()
-
-    # 2️⃣ Decodificar token
     payload = decode_token(token)
+
     user_id = payload.get("user_id")
     if not user_id:
         raise HTTPException(status_code=401, detail="Token inválido")
 
-    # 3️⃣ Usuario
+    # 2️⃣ Buscar usuario
     usuario = db.query(Usuario).filter_by(id=user_id).first()
     if not usuario:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
-    
+
     if usuario.rol != RolEnum.cliente:
         raise HTTPException(
             status_code=403,
             detail="Solo los clientes pueden reservar turnos"
         )
 
-    # 4️⃣ Horario disponible
+    # 3️⃣ Buscar horario disponible
     horario = (
-    db.query(Horario)
-    .filter(
-        Horario.id == data.horario_id,
-        Horario.disponible == True
-    )
-    .first()
+        db.query(Horario)
+        .filter(
+            Horario.id == data.horario_id,
+            Horario.disponible == True
+        )
+        .first()
     )
 
     if not horario:
         raise HTTPException(status_code=400, detail="Horario no disponible")
 
-    # 5️⃣ Fecha pasada
-    fecha_hora = datetime.combine(horario.fecha, horario.hora)
-    if fecha_hora < datetime.now():
+    # 4️⃣ Validar que no sea fecha pasada (con timezone correcto)
+    fecha_hora_turno = datetime.combine(
+        horario.fecha,
+        horario.hora
+    ).replace(tzinfo=ZONA)
+
+    ahora = datetime.now(tz=ZONA)
+
+    if fecha_hora_turno <= ahora:
         raise HTTPException(
             status_code=400,
             detail="No se pueden reservar fechas pasadas"
         )
 
-    # 6️⃣ Servicio válido
-    servicio = db.query(Servicio).filter(
-        Servicio.id == data.servicio_id,
-        Servicio.activo == True
-    ).first()
+    # 5️⃣ Validar servicio activo
+    servicio = (
+        db.query(Servicio)
+        .filter(
+            Servicio.id == data.servicio_id,
+            Servicio.activo == True
+        )
+        .first()
+    )
 
     if not servicio:
         raise HTTPException(status_code=400, detail="Servicio inválido")
 
+    # 6️⃣ Crear turno
     turno = Turno(
         nombre=usuario.nombre,
         telefono=data.telefono,
@@ -264,19 +278,25 @@ def reservar(
     )
 
     horario.disponible = False
+
     db.add(turno)
     db.commit()
     db.refresh(turno)
 
-    # 8️⃣ Email
+    # 7️⃣ Obtener nombre del barbero (sin query extra si hay relación)
+    barbero_nombre = horario.barbero.nombre
+
+    # 8️⃣ Enviar email
     try:
         enviar_email_confirmacion(
             destino=usuario.email,
             nombre=usuario.nombre,
             fecha=horario.fecha.strftime("%d/%m/%Y"),
             hora=horario.hora.strftime("%H:%M"),
-            servicio=servicio.nombre
-    )
+            servicio=servicio.nombre,
+            precio=servicio.precio,
+            barbero=barbero_nombre
+        )
     except Exception as e:
         print("⚠️ Error enviando email:", e)
 
