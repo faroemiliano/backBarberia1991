@@ -72,13 +72,24 @@ def calendario(barbero_id: int, db: Session = Depends(get_db)):
 @router.post("/preparar-calendario")
 def preparar_calendario(db: Session = Depends(get_db)):
 
+    from datetime import datetime, timedelta
+
     anio = date.today().year
-    inicio = date(anio, 1, 1)
+
+    # 🔥 calcular próximo martes
+    hoy = date.today()
+    dias_hasta_martes = (1 - hoy.weekday()) % 7
+    fecha_cambio = hoy + timedelta(days=dias_hasta_martes)
+
+    inicio = fecha_cambio
     fin = date(anio, 12, 31)
 
-    # 🔥 LIMPIAR TODO ANTES (IMPORTANTE)
-    db.query(Turno).delete()
-    db.query(Horario).delete()
+    # 🔥 borrar SOLO horarios futuros disponibles (no rompe turnos)
+    db.query(Horario).filter(
+        Horario.fecha >= fecha_cambio,
+        Horario.disponible == True
+    ).delete()
+
     db.commit()
 
     barberos = db.query(Usuario).filter(
@@ -93,7 +104,7 @@ def preparar_calendario(db: Session = Depends(get_db)):
 
     while actual <= fin:
 
-        dia = actual.weekday()  # 0 lunes - 6 domingo
+        dia = actual.weekday()
 
         # 🎯 Martes a jueves
         if dia in [1, 2, 3]:
@@ -108,31 +119,55 @@ def preparar_calendario(db: Session = Depends(get_db)):
             continue
 
         for inicio_h, fin_h in franjas:
-            hora = inicio_h
 
-            while hora <= fin_h:
-                for barbero in barberos:
+            inicio_dt = datetime.combine(actual, time(inicio_h, 0))
+            fin_dt = datetime.combine(actual, time(fin_h, 0))
 
-            # turno en punto
-                    db.add(Horario(
-                        fecha=actual,
-                        hora=time(hora, 0),
-                        disponible=True,
-                        barbero_id=barbero.id
-                    ))
+            horas_creadas = set()
 
-            # turno y media SOLO si no es la hora final
-                    if hora != fin_h:
+            while inicio_dt <= fin_dt:
+
+                hora_actual = inicio_dt.time()
+
+                # 🔥 evitar duplicados (por si ejecutás varias veces)
+                existe = db.query(Horario).filter(
+                    Horario.fecha == actual,
+                    Horario.hora == hora_actual
+                ).first()
+
+                if not existe:
+                    for barbero in barberos:
                         db.add(Horario(
                             fecha=actual,
-                            hora=time(hora, 30),
+                            hora=hora_actual,
                             disponible=True,
                             barbero_id=barbero.id
                         ))
-
                         creados += 1
 
-                hora += 1
+                horas_creadas.add(hora_actual)
+
+                # 🔥 salto de 40 minutos
+                inicio_dt += timedelta(minutes=40)
+
+            # 🔥 asegurar hora final (ej: 20:00)
+            hora_final = time(fin_h, 0)
+
+            if hora_final not in horas_creadas:
+                existe_final = db.query(Horario).filter(
+                    Horario.fecha == actual,
+                    Horario.hora == hora_final
+                ).first()
+
+                if not existe_final:
+                    for barbero in barberos:
+                        db.add(Horario(
+                            fecha=actual,
+                            hora=hora_final,
+                            disponible=True,
+                            barbero_id=barbero.id
+                        ))
+                        creados += 1
 
         actual += timedelta(days=1)
 
@@ -140,9 +175,9 @@ def preparar_calendario(db: Session = Depends(get_db)):
 
     return {
         "ok": True,
+        "desde": str(fecha_cambio),
         "horarios_creados": creados
     }
-
 # --------------------------------------------------
 # GENERAR TODO EL AÑO (UNA SOLA VEZ)
 # --------------------------------------------------
