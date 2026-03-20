@@ -353,4 +353,4 @@ def obtener_profesionales(db: Session = Depends(get_db)):
             "nombre": p.nombre
         }
         for p in profesionales
-    ]
+    ] 
