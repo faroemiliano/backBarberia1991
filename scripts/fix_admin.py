@@ -11,7 +11,7 @@ ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")  # Email del dueño real
 ADMIN_NOMBRE = os.getenv("ADMIN_NOMBRE", "Dueño")  # Nombre opcional
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "cambiar123")  # Solo si hay login local
 
-# Email del usuario que ya estaba como admin y queremos desactivar
+# Email del usuario que ya estaba como admin y  queremos desactivar
 MI_EMAIL = os.getenv("MI_EMAIL", "tu_email@ejemplo.com")
 
 # ---------------------
