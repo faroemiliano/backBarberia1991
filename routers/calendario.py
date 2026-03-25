@@ -108,11 +108,11 @@ def preparar_calendario(db: Session = Depends(get_db)):
 
         # 🎯 Martes a jueves
         if dia in [1, 2, 3]:
-            franjas = [(11, 14), (15, 20)]
+            franjas = [(11, 13), (15, 20)]
 
         # 🎯 Viernes y sábado
         elif dia in [4, 5]:
-            franjas = [(10, 14), (15, 20)]
+            franjas = [(10, 13), (15, 20)]
 
         else:
             actual += timedelta(days=1)
@@ -354,3 +354,25 @@ def obtener_profesionales(db: Session = Depends(get_db)):
         }
         for p in profesionales
     ] 
+
+# --------------------------------------------------
+# RUTA TEMPORAL: LIMPIAR HORARIOS 14:00
+# --------------------------------------------------
+@router.post("/limpiar-14")
+def limpiar_14(db: Session = Depends(get_db)):
+    """
+    Elimina todos los horarios futuros libres a las 14:00.
+    ⚠️ No toca turnos ya reservados.
+    Usar solo una vez y luego borrar esta ruta.
+    """
+    from datetime import date, time
+
+    eliminados = db.query(Horario).filter(
+        Horario.fecha >= date.today(),  # Solo fechas futuras
+        Horario.hora == time(14, 0),    # Solo 14:00
+        Horario.disponible == True       # Solo horarios libres
+    ).delete(synchronize_session=False)
+
+    db.commit()
+
+    return {"ok": True, "mensaje": f"Se eliminaron {eliminados} horarios de 14:00"}
