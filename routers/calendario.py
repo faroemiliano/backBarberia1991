@@ -134,14 +134,17 @@ def preparar_calendario(db: Session = Depends(get_db)):
 
                 hora_actual = inicio_dt.time()
 
-                # 🔥 evitar duplicados (por si ejecutás varias veces)
-                existe = db.query(Horario).filter(
-                    Horario.fecha == actual,
-                    Horario.hora == hora_actual
-                ).first()
+           
 
-                if not existe:
-                    for barbero in barberos:
+                for barbero in barberos:
+
+                    existe = db.query(Horario).filter(
+                        Horario.fecha == actual,
+                        Horario.hora == hora_actual,
+                        Horario.barbero_id == barbero.id
+                    ).first()
+
+                    if not existe:
                         db.add(Horario(
                             fecha=actual,
                             hora=hora_actual,
@@ -159,13 +162,16 @@ def preparar_calendario(db: Session = Depends(get_db)):
             hora_final = time(fin_h, fin_m)
 
             if hora_final not in horas_creadas:
-                existe_final = db.query(Horario).filter(
-                    Horario.fecha == actual,
-                    Horario.hora == hora_final
-                ).first()
 
-                if not existe_final:
-                    for barbero in barberos:
+                for barbero in barberos:
+
+                    existe_final = db.query(Horario).filter(
+                        Horario.fecha == actual,
+                        Horario.hora == hora_final,
+                        Horario.barbero_id == barbero.id
+                    ).first()
+
+                    if not existe_final:
                         db.add(Horario(
                             fecha=actual,
                             hora=hora_final,
