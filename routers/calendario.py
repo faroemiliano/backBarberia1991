@@ -108,20 +108,25 @@ def preparar_calendario(db: Session = Depends(get_db)):
 
         # 🎯 Martes a jueves
         if dia in [1, 2, 3]:
-            franjas = [(11, 13), (15, 20)]
+            franjas = [(11, 13, 40), (15, 20)]
 
         # 🎯 Viernes y sábado
         elif dia in [4, 5]:
-            franjas = [(10, 13), (15, 20)]
+            franjas = [(10, 13, 40), (15, 20)]
 
         else:
             actual += timedelta(days=1)
             continue
 
-        for inicio_h, fin_h in franjas:
+        for franja in franjas:
+            if len(franja) == 2:
+                inicio_h, fin_h = franja
+                fin_m = 0
+            else:
+                inicio_h, fin_h, fin_m = franja
 
             inicio_dt = datetime.combine(actual, time(inicio_h, 0))
-            fin_dt = datetime.combine(actual, time(fin_h, 0))
+            fin_dt = datetime.combine(actual, time(fin_h, fin_m))
 
             horas_creadas = set()
 
@@ -151,7 +156,7 @@ def preparar_calendario(db: Session = Depends(get_db)):
                 inicio_dt += timedelta(minutes=40)
 
             # 🔥 asegurar hora final (ej: 20:00)
-            hora_final = time(fin_h, 0)
+            hora_final = time(fin_h, fin_m)
 
             if hora_final not in horas_creadas:
                 existe_final = db.query(Horario).filter(
