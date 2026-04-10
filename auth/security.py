@@ -39,5 +39,5 @@ def decode_token(token: str):
     except JWTError:
         raise HTTPException(
             status_code=401,
-            detail="Por favor reinicie sesión, actualizacion hecha...",
+            detail="Por favor reinicie sesión por actualización de la pagina",
         )
