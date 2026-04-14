@@ -12,6 +12,7 @@ from datetime import datetime
 from database import get_db
 
 
+from utils import horarios
 from utils.email import enviar_email_confirmacion
 
 router = APIRouter()
@@ -85,10 +86,15 @@ def preparar_calendario(db: Session = Depends(get_db)):
     fin = date(anio, 12, 31)
 
     # 🔥 borrar SOLO horarios futuros disponibles (no rompe turnos)
-    db.query(Horario).filter(
-        Horario.fecha >= fecha_cambio,
-        Horario.disponible == True
-    ).delete()
+    horarios = db.query(Horario).filter(
+            Horario.hora == time(13, 40),
+            Horario.disponible == True,
+            Horario.fecha >= hoy
+        ).all()
+
+    for h in horarios:
+        if h.fecha.weekday() in [4, 5]:
+            db.delete(h)
 
     db.commit()
 
