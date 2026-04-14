@@ -134,6 +134,11 @@ def preparar_calendario(db: Session = Depends(get_db)):
 
                 hora_actual = inicio_dt.time()
 
+                # 🚫 bloquear 13:40 SOLO viernes (4) y sábado (5)
+                if dia in [4, 5] and hora_actual == time(13, 40):
+                    inicio_dt += timedelta(minutes=40)
+                    continue
+
            
 
                 for barbero in barberos:
@@ -161,10 +166,11 @@ def preparar_calendario(db: Session = Depends(get_db)):
             # 🔥 asegurar hora final (ej: 20:00)
             hora_final = time(fin_h, fin_m)
 
-            if hora_final not in horas_creadas:
-
+# 🚫 no agregar 13:40 en viernes y sábado
+            if dia in [4, 5] and hora_final == time(13, 40):
+                    pass
+            elif hora_final not in horas_creadas:
                 for barbero in barberos:
-
                     existe_final = db.query(Horario).filter(
                         Horario.fecha == actual,
                         Horario.hora == hora_final,
