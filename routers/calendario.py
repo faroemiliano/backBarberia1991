@@ -373,7 +373,8 @@ def obtener_profesionales(db: Session = Depends(get_db)):
     return [
         {
             "id": p.id,
-            "nombre": p.nombre
+            "nombre": p.nombre,
+            "foto_url": p.foto_url
         }
         for p in profesionales
     ] 

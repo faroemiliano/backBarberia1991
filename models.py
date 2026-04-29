@@ -24,6 +24,7 @@ class Usuario(Base):
     nombre = Column(String(100), unique=True, nullable=False)
     email = Column(String(150), unique=True, nullable=False, index=True)
     password = Column(String, nullable=True)
+    foto_url = Column(String, nullable=True)
     rol = Column(
     Enum(RolEnum),
     nullable=False,

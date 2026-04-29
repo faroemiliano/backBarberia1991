@@ -9,9 +9,17 @@ class EditarTurno(BaseModel):
 
 class HorarioOut(BaseModel):
     id: int
-    fecha: str  # ISO format
-    hora: str   # HH:MM
+    fecha: str
+    hora: str
     disponible: bool
 
     class Config:
-        orm_mode = True     
+        from_attributes = True  # 👈 agregar esto
+
+class ProfesionalOut(BaseModel):
+    id: int
+    nombre: str
+    foto_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
