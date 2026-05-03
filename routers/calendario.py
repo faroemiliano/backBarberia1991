@@ -345,18 +345,22 @@ def reservar(
     barbero_nombre = horario.barbero.nombre
 
     # 8️⃣ Enviar email
-    try:
-        enviar_email_confirmacion(
-            destino=usuario.email,
-            nombre=usuario.nombre,
-            fecha=horario.fecha.strftime("%d/%m/%Y"),
-            hora=horario.hora.strftime("%H:%M"),
-            servicio=servicio.nombre,
-            precio=servicio.precio,
-            barbero=barbero_nombre
-        )
-    except Exception as e:
-        print("⚠️ Error enviando email:", e)
+    if usuario.email:
+        try:
+            enviar_email_confirmacion(
+                destino=usuario.email,
+                nombre=usuario.nombre,
+                fecha=horario.fecha.strftime("%d/%m/%Y"),
+                hora=horario.hora.strftime("%H:%M"),
+                servicio=servicio.nombre,
+                precio=servicio.precio,
+                barbero=barbero_nombre
+            )
+            print("✅ Email confirmación enviado")
+        except Exception as e:
+            print("⚠️ Error enviando email:", e)
+    else:
+        print("⚠️ Usuario sin email")
 
     return {
         "ok": True,
