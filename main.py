@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from routers.farixio import contact
 import os
 
 load_dotenv()
@@ -72,6 +73,8 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
         "https://front-barberia1991.vercel.app",
+        "https://farixio.com",
+        "https://www.farixio.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -83,6 +86,7 @@ app.add_middleware(
 # =====================
 # Auth / Google / Registro
 app.include_router(auth.router, prefix="", tags=["Auth"])
+app.include_router(contact.router, prefix="", tags=["Contacto"])
 app.include_router(auth_google.router, prefix="", tags=["Auth Google"])
 
 # Calendario y mis turnos (usuario normal)
