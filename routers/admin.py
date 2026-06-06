@@ -1,13 +1,15 @@
+print("🔥🔥🔥 CARGUE EL ADMIN.PY CORRECTO 🔥🔥🔥")
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import SesionLocal
-from models import Turno, Horario, Servicio
+from models import Turno, Horario, Servicio,  RegistroManual
 from auth.deps import admin_required
 from utils.email import enviar_email_cancelacion
 from utils.email import enviar_email_edicion
 from datetime import date, timedelta, datetime
 from sqlalchemy import func
-from schemas import EditarTurno
+from schemas import EditarTurno, RegistroManualCreate
 from database import get_db
 
 router = APIRouter()
@@ -235,6 +237,40 @@ def calendario_admin(
         for h in horarios
     ]
 
+@router.post("/registros-manuales")
+def crear_registro_manual(
+    data: dict,
+    db: Session = Depends(get_db),
+    user=Depends(admin_required)
+):
+
+    horario = Horario(
+        fecha=date.today(),
+        hora=datetime.now().time(),
+        disponible=False,
+        barbero_id=user.id,   # 🔥 FIX REAL
+    )
+
+    db.add(horario)
+    db.commit()
+    db.refresh(horario)
+
+    nuevo_turno = Turno(
+        nombre=data["nombre"],
+        telefono="",
+        servicio_id=data["servicio_id"],
+        precio=data["precio"],
+        horario_id=horario.id,
+        barbero_id=user.id,   # 🔥 también acá
+        usuario_id=None,
+    )
+
+    db.add(nuevo_turno)
+    db.commit()
+    db.refresh(nuevo_turno)
+
+    return {"ok": True, "turno_id": nuevo_turno.id}
+
 @router.get("/ganancias")
 def ver_ganancias(
     tipo: str,
@@ -421,3 +457,5 @@ def resumen_mes(
         "ganancia_mes": total_mes,
         "dias": dias
     }
+
+

@@ -137,3 +137,31 @@ class Turno(Base):
 
     def __repr__(self):
         return f"<Turno {self.id} horario={self.horario_id} usuario={self.usuario_id} barbero={self.barbero_id}>"
+    
+class RegistroManual(Base):
+    __tablename__ = "registros_manuales"
+
+    id = Column(Integer, primary_key=True)
+
+    nombre = Column(String(100), nullable=False)
+
+    servicio_id = Column(
+        Integer,
+        ForeignKey("servicios.id"),
+        nullable=False
+    )
+
+    barbero_id = Column(
+        Integer,
+        ForeignKey("usuarios.id"),
+        nullable=True
+    )
+
+    precio = Column(Float, nullable=False)
+
+    observaciones = Column(String(500))
+
+    fecha = Column(Date, nullable=False)
+
+    servicio = relationship("Servicio")
+    barbero = relationship("Usuario")

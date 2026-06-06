@@ -15,6 +15,7 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
+    print("=== ENTRE A GET_CURRENT_USER ===")
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
@@ -37,6 +38,7 @@ def get_current_user(
 def admin_required(
     user: Usuario = Depends(get_current_user)
 ):
+    print("🔥 ADMIN_REQUIRED")
     if user.rol != RolEnum.admin:
         raise HTTPException(status_code=403, detail="No autorizado")
     return user

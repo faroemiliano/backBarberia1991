@@ -1,6 +1,7 @@
 # routers/turnos_usuario.py
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session, joinedload
+from auth.deps import get_current_user
 from database import get_db
 from models import Turno, Usuario, Horario, Servicio
 from auth.security import decode_token
@@ -124,3 +125,4 @@ def cancelar_turno(
     db.commit()
 
     return {"ok": True, "mensaje": "Turno cancelado"}
+

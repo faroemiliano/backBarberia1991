@@ -23,3 +23,9 @@ class ProfesionalOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class RegistroManualCreate(BaseModel):
+    nombre: str
+    servicio_id: int
+    precio: float
+    observaciones: str | None = None        
