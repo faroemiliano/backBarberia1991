@@ -29,7 +29,7 @@ def decode_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
-        sub = payload.get("sub")
+        sub = payload.get("user_id")  # ✅ CORRECTO
         if not sub:
             raise HTTPException(status_code=401, detail="Token sin sub")
 

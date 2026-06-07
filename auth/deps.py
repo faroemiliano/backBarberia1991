@@ -18,7 +18,7 @@ def get_current_user(
     print("=== ENTRE A GET_CURRENT_USER ===")
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
+        user_id = payload.get("user_id")  # ✅ CORRECTO
 
         if not user_id:
             raise HTTPException(status_code=401, detail="Token inválido")
@@ -52,7 +52,7 @@ def barbero_required(
     token = authorization.replace("Bearer ", "").strip()
     payload = decode_token(token)
 
-    user_id = payload.get("sub")  # ✅ CORRECTO
+    user_id = payload.get("user_id")  # ✅ CORRECTO
 
     if not user_id:
         raise HTTPException(status_code=401, detail="Token inválido")
