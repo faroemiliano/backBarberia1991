@@ -43,6 +43,7 @@ def ver_turnos(
             "servicio": t.servicio.nombre,
             "precio": t.precio,  # ✅ AGREGADO
             "barbero": t.barbero.nombre if t.barbero else None,
+            "barbero_id": t.barbero_id,
         }
         for t in turnos
     ]
