@@ -43,18 +43,22 @@ def login_google(payload: dict, db: Session = Depends(get_db)):
             db.refresh(user)
 
         jwt = create_token({
-            "sub": str(user.id),
-            "rol": user.rol.value  # guardamos el rol en el token
-
+            "user_id": user.id,
+            "email": user.email,
+            "rol": user.rol.value,
+            "telefono": user.telefono
         })
 
+       
+       
         return {
             "access_token": jwt,
             "user": {
                 "id": user.id,
                 "nombre": user.nombre,
                 "email": user.email,
-                "rol": user.rol.value
+                "rol": user.rol.value,
+                "telefono": user.telefono,
             }
         }
 

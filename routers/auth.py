@@ -47,7 +47,8 @@ def acceso(data: UserLogin, db: Session = Depends(get_db)):
     token = create_token({
     "user_id": user.id,        # 🔥 CLAVE
     "email": user.email,
-    "rol": user.rol.value
+    "rol": user.rol.value,
+    "telefono": user.telefono
 })
 
     return {
@@ -56,6 +57,7 @@ def acceso(data: UserLogin, db: Session = Depends(get_db)):
             "id": user.id,
             "nombre": user.nombre,
             "email": user.email,
-            "rol": user.rol.value
+            "rol": user.rol.value,
+            "telefono": user.telefono
         }
     }

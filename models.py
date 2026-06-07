@@ -25,10 +25,13 @@ class Usuario(Base):
     email = Column(String(150), unique=True, nullable=False, index=True)
     password = Column(String, nullable=True)
     foto_url = Column(String, nullable=True)
+    telefono = Column(String(30), nullable=True)
+    
     rol = Column(
     Enum(RolEnum),
     nullable=False,
     server_default=text("'cliente'")
+    
 )
 
     # Turnos como cliente

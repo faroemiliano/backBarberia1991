@@ -323,11 +323,14 @@ def reservar(
 
     if not servicio:
         raise HTTPException(status_code=400, detail="Servicio inválido")
+    
+    if not usuario.telefono and data.telefono:
+        usuario.telefono = data.telefono
 
     # 6️⃣ Crear turno
     turno = Turno(
         nombre=usuario.nombre,
-        telefono=data.telefono,
+        telefono=usuario.telefono,
         horario_id=horario.id,
         usuario_id=usuario.id,
         servicio_id=servicio.id,
@@ -366,6 +369,7 @@ def reservar(
         "ok": True,
         "mensaje": "Turno reservado y enviado por email",
         "turno_id": turno.id,
+        "telefono": usuario.telefono
     }
 
 @router.get("/profesionales")
