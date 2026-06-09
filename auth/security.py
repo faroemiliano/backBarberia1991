@@ -7,7 +7,7 @@ import os
 SECRET_KEY = os.getenv("SECRET_KEY")
 print("SECRET_KEY usada:", SECRET_KEY)
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 90
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

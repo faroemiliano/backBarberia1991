@@ -3,13 +3,14 @@ print("🔥🔥🔥 CARGUE EL ADMIN.PY CORRECTO 🔥🔥🔥")
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import SesionLocal
-from models import Turno, Horario, Servicio,  RegistroManual
+from models import Turno, Horario, Servicio
 from auth.deps import admin_required
+from routers.calendario import ZONA
 from utils.email import enviar_email_cancelacion
 from utils.email import enviar_email_edicion
 from datetime import date, timedelta, datetime
 from sqlalchemy import func
-from schemas import EditarTurno, RegistroManualCreate
+from schemas import EditarTurno
 from database import get_db
 
 router = APIRouter()
@@ -245,11 +246,13 @@ def crear_registro_manual(
     user=Depends(admin_required)
 ):
 
+    ahora = datetime.now(ZONA)
+
     horario = Horario(
-        fecha=date.today(),
-        hora=datetime.now().time(),
+        fecha=ahora.date(),
+        hora=ahora.time().replace(second=0, microsecond=0),
         disponible=False,
-        barbero_id=user.id,   # 🔥 FIX REAL
+        barbero_id=user.id,
     )
 
     db.add(horario)
