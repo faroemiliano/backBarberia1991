@@ -35,17 +35,31 @@ def panel_barbero(
 
     hoy = date.today()
 
-    dinero_diario = sum(
-        t.precio for t in turnos
+    facturado_diario = sum(
+    t.precio
+    for t in turnos
+    if t.horario.fecha == hoy
+    )
+
+    ganancia_diaria = sum(
+        t.precio * 0.60
+        for t in turnos
         if t.horario.fecha == hoy
     )
 
-    dinero_mensual = sum(
-        t.precio for t in turnos
+    facturado_mensual = sum(
+        t.precio
+        for t in turnos
         if t.horario.fecha.month == hoy.month
         and t.horario.fecha.year == hoy.year
     )
 
+    ganancia_mensual = sum(
+        t.precio * 0.60
+        for t in turnos
+        if t.horario.fecha.month == hoy.month
+        and t.horario.fecha.year == hoy.year
+    )
     return {
         "turnos": [
             {
@@ -57,12 +71,18 @@ def panel_barbero(
                 "horario_id": t.horario.id,
                 "servicio": t.servicio.nombre,
                 "precio": t.precio,
+                "servicio_id": t.servicio_id,
+                "barbero_id": t.barbero_id,
             }
             for t in turnos
         ],
-        "dinero_diario": dinero_diario,
-        "dinero_mensual": dinero_mensual,
-    }
+
+        "facturado_diario": round(facturado_diario, 2),
+        "ganancia_diaria": round(ganancia_diaria, 2),
+
+        "facturado_mensual": round(facturado_mensual, 2),
+        "ganancia_mensual": round(ganancia_mensual, 2),
+}
 
 @router.put("/barbero/turnos/{turno_id}")
 def editar_turno(
@@ -187,3 +207,33 @@ def toggle_horario_barbero(
     db.refresh(horario)
 
     return {"ok": True, "disponible": horario.disponible}
+
+@router.delete("/barbero/turnos/{turno_id}")
+def cancelar_turno_barbero(
+    turno_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(barbero_required),
+):
+    turno = db.query(Turno).filter(
+        Turno.id == turno_id,
+        Turno.barbero_id == user.id
+    ).first()
+
+    if not turno:
+        raise HTTPException(
+            status_code=404,
+            detail="Turno no encontrado"
+        )
+
+    horario = turno.horario
+
+    # liberar horario
+    horario.disponible = True
+
+    db.delete(turno)
+    db.commit()
+
+    return {
+        "ok": True,
+        "mensaje": "Turno cancelado correctamente"
+    }

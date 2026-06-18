@@ -63,3 +63,14 @@ def barbero_required(
         raise HTTPException(status_code=403, detail="No autorizado")
 
     return user
+
+def empleado_required(
+    user: Usuario = Depends(get_current_user)
+):
+    if user.rol not in [RolEnum.admin, RolEnum.barbero]:
+        raise HTTPException(
+            status_code=403,
+            detail="No autorizado"
+        )
+
+    return user

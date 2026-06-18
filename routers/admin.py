@@ -3,8 +3,8 @@ print("🔥🔥🔥 CARGUE EL ADMIN.PY CORRECTO 🔥🔥🔥")
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import SesionLocal
-from models import Turno, Horario, Servicio
-from auth.deps import admin_required
+from models import RolEnum, Turno, Horario, Servicio
+from auth.deps import admin_required, barbero_required
 from routers.calendario import ZONA
 from utils.email import enviar_email_cancelacion
 from utils.email import enviar_email_edicion
@@ -243,7 +243,7 @@ def calendario_admin(
 def crear_registro_manual(
     data: dict,
     db: Session = Depends(get_db),
-    user=Depends(admin_required)
+    user=Depends(barbero_required)
 ):
 
     ahora = datetime.now(ZONA)
@@ -283,42 +283,71 @@ def ver_ganancias(
     db: Session = Depends(get_db),
     user=Depends(admin_required),
 ):
+    query = db.query(Turno).join(Turno.horario)
+
     if tipo == "dia":
         dia = date.fromisoformat(fecha)
 
-        print("---- TURNOS EN DB ----")
-        turnos = db.query(Turno).limit(20).all()
-        for t in turnos:
-            print("turno:", t.id, "horario_id:", t.horario_id, "precio:", t.precio)
-
-        print("---- HORARIOS ----")
-        horarios = db.query(Horario).limit(20).all()
-        for h in horarios:
-            print("horario:", h.id, "fecha:", h.fecha)
-        total = (
-            db.query(func.coalesce(func.sum(Turno.precio), 0))
-            .join(Turno.horario)
-            .filter(Horario.fecha == dia)
-            .scalar()
+        query = query.filter(
+            Horario.fecha == dia
         )
 
     elif tipo == "mes":
         y, m = map(int, mes.split("-"))
 
-        total = (
-            db.query(func.coalesce(func.sum(Turno.precio), 0))
-            .join(Turno.horario)
-            .filter(
-                func.extract("year", Horario.fecha) == y,
-                func.extract("month", Horario.fecha) == m,
-            )
-            .scalar()
+        query = query.filter(
+            func.extract("year", Horario.fecha) == y,
+            func.extract("month", Horario.fecha) == m,
         )
 
-    else:
-        total = 0
+    turnos = query.all()
 
-    return {"total": float(total)}
+    facturacion_total = 0
+
+    ganancia_admin_propia = 0
+    ganancia_admin_alquiler = 0
+    ganancia_barberos = 0
+
+    for t in turnos:
+
+        facturacion_total += t.precio
+
+        if (
+            t.barbero
+            and t.barbero.rol == RolEnum.admin
+        ):
+            # Trabajo realizado por el admin
+            ganancia_admin_propia += t.precio
+
+        else:
+            # Trabajo realizado por un barbero
+            ganancia_admin_alquiler += t.precio * 0.40
+            ganancia_barberos += t.precio * 0.60
+
+    ganancia_admin_total = (
+        ganancia_admin_propia
+        + ganancia_admin_alquiler
+    )
+
+    return {
+        "facturacion_total": round(facturacion_total, 2),
+
+        "ganancia_admin_propia": round(
+            ganancia_admin_propia, 2
+        ),
+
+        "ganancia_admin_alquiler": round(
+            ganancia_admin_alquiler, 2
+        ),
+
+        "ganancia_admin_total": round(
+            ganancia_admin_total, 2
+        ),
+
+        "ganancia_barberos": round(
+            ganancia_barberos, 2
+        ),
+    }
 
 @router.get("/ganancias/grafico")
 def ganancias_grafico(
@@ -377,14 +406,13 @@ def detalle_ganancias(
     fin = base + timedelta(days=1)
 
     query = (
-        db.query(
-            Turno.nombre,
-            Servicio.nombre.label("servicio"),
-            Turno.precio
-        )
+        db.query(Turno)
         .join(Turno.servicio)
         .join(Turno.horario)
-        .filter(Horario.fecha >= inicio, Horario.fecha < fin)
+        .filter(
+            Horario.fecha >= inicio,
+            Horario.fecha < fin
+        )
     )
 
     if servicio:
@@ -392,10 +420,34 @@ def detalle_ganancias(
 
     resultados = query.all()
 
-    return [
-        {"nombre": r.nombre, "servicio": r.servicio, "precio": r.precio}
-        for r in resultados
-    ]
+    detalle = []
+
+    for t in resultados:
+
+        if t.barbero and t.barbero.rol == RolEnum.admin:
+
+            admin_propia = t.precio
+            admin_alquiler = 0
+            barbero = 0
+
+        else:
+
+            admin_propia = 0
+            admin_alquiler = t.precio * 0.40
+            barbero = t.precio * 0.60
+
+        detalle.append(
+            {
+                "nombre": t.nombre,
+                "servicio": t.servicio.nombre,
+                "precio": t.precio,
+                "admin_propia": round(admin_propia, 2),
+                "admin_alquiler": round(admin_alquiler, 2),
+                "barbero": round(barbero, 2),
+            }
+        )
+
+    return detalle
 @router.get("/estadisticas/dia")
 def clientes_por_dia(
     fecha: str,
