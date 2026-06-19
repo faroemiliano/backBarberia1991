@@ -7,7 +7,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from auth.deps import barbero_required
+from auth.deps import barbero_required, empleado_required
 from auth.security import decode_token
 from database import get_db
 from models import Turno, Usuario, Horario, Servicio
@@ -89,7 +89,7 @@ def editar_turno(
     turno_id: int,
     data: EditarTurnoRequest,
     db: Session = Depends(get_db),
-    user=Depends(barbero_required),
+    user=Depends(empleado_required)  # 🔥 mejor usar dependencia,
 ):
     turno = db.query(Turno).filter(
         Turno.id == turno_id,

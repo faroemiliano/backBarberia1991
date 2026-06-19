@@ -46,22 +46,10 @@ def admin_required(
 
 # 💈 Barbero
 def barbero_required(
-    db: Session = Depends(get_db),
-    authorization: str = Header(...)
+    user: Usuario = Depends(get_current_user)
 ):
-    token = authorization.replace("Bearer ", "").strip()
-    payload = decode_token(token)
-
-    user_id = payload.get("user_id")  # ✅ CORRECTO
-
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
-    user = db.query(Usuario).filter_by(id=int(user_id)).first()
-
-    if not user or user.rol != RolEnum.barbero:
+    if user.rol not in [RolEnum.admin, RolEnum.barbero]:
         raise HTTPException(status_code=403, detail="No autorizado")
-
     return user
 
 def empleado_required(

@@ -1,5 +1,7 @@
 print("🔥🔥🔥 CARGUE EL ADMIN.PY CORRECTO 🔥🔥🔥")
 
+from sqlite3 import IntegrityError
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import SesionLocal
@@ -245,36 +247,64 @@ def crear_registro_manual(
     db: Session = Depends(get_db),
     user=Depends(barbero_required)
 ):
-
     ahora = datetime.now(ZONA)
 
-    horario = Horario(
-        fecha=ahora.date(),
-        hora=ahora.time().replace(second=0, microsecond=0),
-        disponible=False,
-        barbero_id=user.id,
-    )
+    fecha = ahora.date()
+    hora = ahora.time().replace(second=0, microsecond=0)
 
-    db.add(horario)
-    db.commit()
-    db.refresh(horario)
+    print("======== REGISTRO MANUAL ========")
+    print("USER ID:", user.id)
+    print("ROL:", user.rol)
+    print("NOMBRE:", user.nombre)
+    print("FECHA:", fecha)
+    print("HORA:", hora)
 
-    nuevo_turno = Turno(
-        nombre=data["nombre"],
-        telefono="",
-        servicio_id=data["servicio_id"],
-        precio=data["precio"],
-        horario_id=horario.id,
-        barbero_id=user.id,   # 🔥 también acá
-        usuario_id=None,
-    )
+    try:
+        # ⚠️ NO DEPENDER DEL CHECK (solo debug, no seguridad real)
+        horario = Horario(
+            fecha=fecha,
+            hora=hora,
+            disponible=False,
+            barbero_id=user.id,
+        )
 
-    db.add(nuevo_turno)
-    db.commit()
-    db.refresh(nuevo_turno)
+        db.add(horario)
+        db.flush()  # genera ID sin commit
 
-    return {"ok": True, "turno_id": nuevo_turno.id}
+        turno = Turno(
+            nombre=data["nombre"],
+            telefono="",
+            servicio_id=data["servicio_id"],
+            precio=data["precio"],
+            horario_id=horario.id,
+            barbero_id=user.id,
+            usuario_id=None,
+        )
 
+        db.add(turno)
+        db.commit()
+
+        return {
+            "ok": True,
+            "turno_id": turno.id
+        }
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Ya existe un registro para este barbero en ese horario"
+        )
+
+    except Exception as e:
+        db.rollback()
+        print("💥 ERROR:", str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno"
+        )
+
+    
 @router.get("/ganancias")
 def ver_ganancias(
     tipo: str,
