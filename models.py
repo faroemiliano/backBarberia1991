@@ -133,6 +133,12 @@ class Turno(Base):
 
     precio = Column(Float, nullable=False)
 
+    fecha = Column(Date, nullable=True)
+    hora = Column(Time, nullable=True)
+    es_manual = Column(Boolean, nullable=False, default=False)
+
+   
+
     horario = relationship("Horario", back_populates="turno")
     usuario = relationship("Usuario", back_populates="turnos", foreign_keys=[usuario_id])
     barbero = relationship("Usuario", back_populates="turnos_barbero", foreign_keys=[barbero_id])

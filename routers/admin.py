@@ -3,11 +3,11 @@ print("🔥🔥🔥 CARGUE EL ADMIN.PY CORRECTO 🔥🔥🔥")
 from sqlite3 import IntegrityError
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from database import SesionLocal
 from models import RolEnum, Turno, Horario, Servicio
 from auth.deps import admin_required, barbero_required
-from routers.calendario import ZONA
+from routers.calendario import ZONA, RegistroManualRequest
 from utils.email import enviar_email_cancelacion
 from utils.email import enviar_email_edicion
 from datetime import date, timedelta, datetime
@@ -31,8 +31,11 @@ def ver_turnos(
 ):
     turnos = (
         db.query(Turno)
-        .join(Horario)
-        .order_by(Horario.fecha, Horario.hora)
+        .options(
+            joinedload(Turno.servicio),
+            joinedload(Turno.barbero)
+        )
+        .order_by(Turno.fecha.desc(), Turno.hora.desc())
         .all()
     )
 
@@ -41,12 +44,13 @@ def ver_turnos(
             "id": t.id,
             "nombre": t.nombre,
             "telefono": t.telefono,
-            "fecha": t.horario.fecha.isoformat(),
-            "hora": t.horario.hora.strftime("%H:%M"),
+            "fecha": t.fecha.isoformat() if t.fecha else None,
+            "hora": t.hora.strftime("%H:%M") if t.hora else None,
             "servicio": t.servicio.nombre,
-            "precio": t.precio,  # ✅ AGREGADO
+            "precio": t.precio,
             "barbero": t.barbero.nombre if t.barbero else None,
             "barbero_id": t.barbero_id,
+            "es_manual": t.es_manual,
         }
         for t in turnos
     ]
@@ -62,19 +66,22 @@ def cancelar_turno(
     user=Depends(admin_required)
 ):
     turno = db.query(Turno).filter_by(id=turno_id).first()
+
     if not turno:
         raise HTTPException(status_code=404, detail="Turno no encontrado")
 
-    horario = db.query(Horario).filter_by(id=turno.horario_id).first()
-    if not horario:
-        raise HTTPException(status_code=404, detail="Horario no encontrado")
+    # 🔥 Horario puede ser NULL (turnos manuales)
+    horario = None
+    if turno.horario_id:
+        horario = db.query(Horario).filter_by(id=turno.horario_id).first()
 
-    # Guardamos datos ANTES de borrar
+    # Guardamos datos antes de borrar
     servicio = turno.servicio
     nombre = turno.nombre
 
-    # Liberar horario
-    horario.disponible = True
+    # 🔓 Liberar horario solo si existe
+    if horario:
+        horario.disponible = True
 
     # 📧 EMAIL DE CANCELACIÓN
     try:
@@ -82,9 +89,9 @@ def cancelar_turno(
             enviar_email_cancelacion(
                 destino=turno.usuario.email,
                 nombre=nombre,
-                fecha=horario.fecha,
-                hora=horario.hora,
-                servicio=servicio  
+                fecha=horario.fecha if horario else turno.fecha,
+                hora=horario.hora if horario else turno.hora,
+                servicio=servicio
             )
             print("📧 Email de cancelación enviado")
         else:
@@ -92,7 +99,7 @@ def cancelar_turno(
     except Exception as e:
         print("❌ Error enviando email:", e)
 
-    # Eliminar turno
+    # 🗑️ Eliminar turno
     db.delete(turno)
     db.commit()
 
@@ -243,62 +250,57 @@ def calendario_admin(
 
 @router.post("/registros-manuales")
 def crear_registro_manual(
-    data: dict,
+    data: RegistroManualRequest,
     db: Session = Depends(get_db),
     user=Depends(barbero_required)
 ):
-    ahora = datetime.now(ZONA)
-
-    fecha = ahora.date()
-    hora = ahora.time().replace(second=0, microsecond=0)
-
-    print("======== REGISTRO MANUAL ========")
-    print("USER ID:", user.id)
-    print("ROL:", user.rol)
-    print("NOMBRE:", user.nombre)
-    print("FECHA:", fecha)
-    print("HORA:", hora)
+    
 
     try:
-        # ⚠️ NO DEPENDER DEL CHECK (solo debug, no seguridad real)
-        horario = Horario(
-            fecha=fecha,
-            hora=hora,
-            disponible=False,
-            barbero_id=user.id,
+
+        servicio = (
+            db.query(Servicio)
+            .filter(
+                Servicio.id == data.servicio_id,
+                Servicio.activo == True
+            )
+            .first()
         )
 
-        db.add(horario)
-        db.flush()  # genera ID sin commit
+        if not servicio:
+            raise HTTPException(
+                status_code=400,
+                detail="Servicio inválido"
+            )
 
         turno = Turno(
-            nombre=data["nombre"],
+            nombre=data.nombre,
             telefono="",
-            servicio_id=data["servicio_id"],
-            precio=data["precio"],
-            horario_id=horario.id,
+            servicio_id=data.servicio_id,
+            precio=servicio.precio,
+            horario_id=None,
+            fecha=data.fecha,
+            hora=data.hora,
             barbero_id=user.id,
             usuario_id=None,
+            es_manual=True
         )
 
         db.add(turno)
         db.commit()
+        db.refresh(turno)
 
         return {
             "ok": True,
             "turno_id": turno.id
         }
 
-    except IntegrityError:
+    except HTTPException:
         db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail="Ya existe un registro para este barbero en ese horario"
-        )
+        raise
 
     except Exception as e:
         db.rollback()
-        print("💥 ERROR:", str(e))
         raise HTTPException(
             status_code=500,
             detail="Error interno"
@@ -313,27 +315,24 @@ def ver_ganancias(
     db: Session = Depends(get_db),
     user=Depends(admin_required),
 ):
-    query = db.query(Turno).join(Turno.horario)
+    query = db.query(Turno)
 
     if tipo == "dia":
         dia = date.fromisoformat(fecha)
 
-        query = query.filter(
-            Horario.fecha == dia
-        )
+        query = query.filter(Turno.fecha == dia)
 
     elif tipo == "mes":
         y, m = map(int, mes.split("-"))
 
         query = query.filter(
-            func.extract("year", Horario.fecha) == y,
-            func.extract("month", Horario.fecha) == m,
+            func.extract("year", Turno.fecha) == y,
+            func.extract("month", Turno.fecha) == m,
         )
 
     turnos = query.all()
 
     facturacion_total = 0
-
     ganancia_admin_propia = 0
     ganancia_admin_alquiler = 0
     ganancia_barberos = 0
@@ -342,41 +341,17 @@ def ver_ganancias(
 
         facturacion_total += t.precio
 
-        if (
-            t.barbero
-            and t.barbero.rol == RolEnum.admin
-        ):
-            # Trabajo realizado por el admin
+        if t.barbero and t.barbero.rol == RolEnum.admin:
             ganancia_admin_propia += t.precio
-
         else:
-            # Trabajo realizado por un barbero
             ganancia_admin_alquiler += t.precio * 0.40
             ganancia_barberos += t.precio * 0.60
 
-    ganancia_admin_total = (
-        ganancia_admin_propia
-        + ganancia_admin_alquiler
-    )
-
     return {
         "facturacion_total": round(facturacion_total, 2),
-
-        "ganancia_admin_propia": round(
-            ganancia_admin_propia, 2
-        ),
-
-        "ganancia_admin_alquiler": round(
-            ganancia_admin_alquiler, 2
-        ),
-
-        "ganancia_admin_total": round(
-            ganancia_admin_total, 2
-        ),
-
-        "ganancia_barberos": round(
-            ganancia_barberos, 2
-        ),
+        "ganancia_admin_propia": round(ganancia_admin_propia, 2),
+        "ganancia_admin_alquiler": round(ganancia_admin_alquiler, 2),
+        "ganancia_barberos": round(ganancia_barberos, 2),
     }
 
 @router.get("/ganancias/grafico")
@@ -396,8 +371,7 @@ def ganancias_grafico(
                 func.sum(Turno.precio).label("total")
             )
             .join(Turno.servicio)
-            .join(Turno.horario)
-            .filter(Horario.fecha == dia)
+            .filter(Turno.fecha == dia)
             .group_by(Servicio.nombre)
             .all()
         )
@@ -411,18 +385,21 @@ def ganancias_grafico(
                 func.sum(Turno.precio).label("total")
             )
             .join(Turno.servicio)
-            .join(Turno.horario)
             .filter(
-                func.extract("year", Horario.fecha) == y,
-                func.extract("month", Horario.fecha) == m,
+                func.extract("year", Turno.fecha) == y,
+                func.extract("month", Turno.fecha) == m,
             )
             .group_by(Servicio.nombre)
             .all()
         )
+
     else:
         return []
 
-    return [{"servicio": r.servicio, "total": float(r.total)} for r in resultados]
+    return [
+        {"servicio": r.servicio, "total": float(r.total)}
+        for r in resultados
+    ]
 
 @router.get("/ganancias/detalle")
 def detalle_ganancias(
@@ -438,10 +415,9 @@ def detalle_ganancias(
     query = (
         db.query(Turno)
         .join(Turno.servicio)
-        .join(Turno.horario)
         .filter(
-            Horario.fecha >= inicio,
-            Horario.fecha < fin
+            Turno.fecha >= inicio,
+            Turno.fecha < fin
         )
     )
 
@@ -455,13 +431,10 @@ def detalle_ganancias(
     for t in resultados:
 
         if t.barbero and t.barbero.rol == RolEnum.admin:
-
             admin_propia = t.precio
             admin_alquiler = 0
             barbero = 0
-
         else:
-
             admin_propia = 0
             admin_alquiler = t.precio * 0.40
             barbero = t.precio * 0.60
@@ -488,8 +461,7 @@ def clientes_por_dia(
 
     total = (
         db.query(func.count(Turno.id))
-        .join(Turno.horario)
-        .filter(Horario.fecha == fecha_date)
+        .filter(Turno.fecha == fecha_date)
         .scalar()
     )
 
@@ -510,17 +482,16 @@ def resumen_mes(
 ):
     resultados = (
         db.query(
-            Horario.fecha.label("fecha"),
+            Turno.fecha.label("fecha"),
             func.count(Turno.id).label("clientes"),
             func.coalesce(func.sum(Turno.precio), 0).label("total")
         )
-        .outerjoin(Turno, Turno.horario_id == Horario.id)
         .filter(
-            func.extract("year", Horario.fecha) == anio,
-            func.extract("month", Horario.fecha) == mes,
+            func.extract("year", Turno.fecha) == anio,
+            func.extract("month", Turno.fecha) == mes,
         )
-        .group_by(Horario.fecha)
-        .order_by(Horario.fecha)
+        .group_by(Turno.fecha)
+        .order_by(Turno.fecha)
         .all()
     )
 
@@ -543,5 +514,4 @@ def resumen_mes(
         "ganancia_mes": total_mes,
         "dias": dias
     }
-
 

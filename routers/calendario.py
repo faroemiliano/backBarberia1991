@@ -22,7 +22,17 @@ router = APIRouter()
 class SolicitudTurno(BaseModel):
     telefono: str = Field(..., min_length=8, max_length=20)
     servicio_id: int
-    horario_id: int
+    horario_id: int | None = None
+   
+
+
+class RegistroManualRequest(BaseModel):
+    nombre: str
+    servicio_id: int
+    precio: float
+    observaciones: str | None = None
+    fecha: date
+    hora: time    
     
 
 # --------------------------------------------------
@@ -46,15 +56,21 @@ def calendario(barbero_id: int, db: Session = Depends(get_db)):
     hoy = date.today()
 
     horarios = (
-        db.query(Horario)
-        .filter(
-            Horario.barbero_id == barbero_id,
-            Horario.disponible == True,
-            Horario.fecha >= hoy
-        )
-        .order_by(Horario.fecha, Horario.hora)
-        .all()
+    db.query(Horario)
+    .filter(
+        Horario.barbero_id == barbero_id,
+        Horario.disponible == True,
+        Horario.fecha >= hoy,
     )
+    .order_by(Horario.fecha, Horario.hora)
+    .all()
+)
+
+    # ❌ filtrar domingos en Python
+    horarios = [
+        h for h in horarios
+        if h.fecha.weekday() != 6
+    ]
 
     # ⚠️ No devolver 404 si no hay horarios
     # Simplemente devolver lista vacía
@@ -284,23 +300,32 @@ def reservar(
             detail="Solo los clientes pueden reservar turnos"
         )
 
-    # 3️⃣ Buscar horario disponible
-    horario = (
-        db.query(Horario)
-        .filter(
+    # 3️⃣ Horario (opcional)
+    horario = None
+
+    if data.horario_id:
+        horario = db.query(Horario).filter(
             Horario.id == data.horario_id,
             Horario.disponible == True
-        )
-        .first()
-    )
+        ).first()
 
-    if not horario:
-        raise HTTPException(status_code=400, detail="Horario no disponible")
+        if not horario:
+            raise HTTPException(400, "Horario no disponible")
 
-    # 4️⃣ Validar que no sea fecha pasada (con timezone correcto)
+    # 4️⃣ Definir fecha y hora (CLAVE DEL FIX)
+    if horario:
+        fecha_turno = horario.fecha
+        hora_turno = horario.hora
+    else:
+        if not data.fecha or not data.hora:
+            raise HTTPException(400, "Fecha y hora requeridas para turno manual")
+
+        fecha_turno = data.fecha
+        hora_turno = data.hora
+
     fecha_hora_turno = datetime.combine(
-        horario.fecha,
-        horario.hora
+        fecha_turno,
+        hora_turno
     ).replace(tzinfo=ZONA)
 
     ahora = datetime.now(tz=ZONA)
@@ -311,7 +336,7 @@ def reservar(
             detail="No se pueden reservar fechas pasadas"
         )
 
-    # 5️⃣ Validar servicio activo
+    # 5️⃣ Servicio
     servicio = (
         db.query(Servicio)
         .filter(
@@ -323,51 +348,52 @@ def reservar(
 
     if not servicio:
         raise HTTPException(status_code=400, detail="Servicio inválido")
-    
+
+    # 6️⃣ Update teléfono si viene vacío
     if not usuario.telefono and data.telefono:
         usuario.telefono = data.telefono
 
-    # 6️⃣ Crear turno
+    # 7️⃣ Crear turno (FIX IMPORTANTE)
     turno = Turno(
         nombre=usuario.nombre,
         telefono=usuario.telefono,
-        horario_id=horario.id,
+        horario_id=horario.id if horario else None,
         usuario_id=usuario.id,
         servicio_id=servicio.id,
         precio=servicio.precio,
-        barbero_id=horario.barbero_id
+        barbero_id=horario.barbero_id if horario else None,
+        fecha=fecha_turno,
+        hora=hora_turno
     )
 
-    horario.disponible = False
+    # 8️⃣ Bloquear horario SOLO si existe
+    if horario:
+        horario.disponible = False
 
     db.add(turno)
     db.commit()
     db.refresh(turno)
 
-    # 7️⃣ Obtener nombre del barbero (sin query extra si hay relación)
-    barbero_nombre = horario.barbero.nombre
+    # 9️⃣ Email seguro
+    barbero_nombre = horario.barbero.nombre if horario else "Manual"
 
-    # 8️⃣ Enviar email
     if usuario.email:
         try:
             enviar_email_confirmacion(
                 destino=usuario.email,
                 nombre=usuario.nombre,
-                fecha=horario.fecha.strftime("%d/%m/%Y"),
-                hora=horario.hora.strftime("%H:%M"),
+                fecha=fecha_turno.strftime("%d/%m/%Y"),
+                hora=hora_turno.strftime("%H:%M"),
                 servicio=servicio.nombre,
                 precio=servicio.precio,
                 barbero=barbero_nombre
             )
-            print("✅ Email confirmación enviado")
         except Exception as e:
             print("⚠️ Error enviando email:", e)
-    else:
-        print("⚠️ Usuario sin email")
 
     return {
         "ok": True,
-        "mensaje": "Turno reservado y enviado por email",
+        "mensaje": "Turno reservado correctamente",
         "turno_id": turno.id,
         "telefono": usuario.telefono
     }
