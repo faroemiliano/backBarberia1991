@@ -244,6 +244,7 @@ def calendario_admin(
             "fecha": h.fecha.isoformat(),
             "hora": h.hora.strftime("%H:%M"),
             "disponible": h.disponible,
+            "barbero_id": h.barbero_id,
         }
         for h in horarios
     ]
