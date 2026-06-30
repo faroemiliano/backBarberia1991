@@ -23,6 +23,12 @@ class EditarTurnoRequest(BaseModel):
     servicio_id: Optional[int] = None
     
 
+def obtener_fecha_hora_turno(turno):
+    if turno.horario:
+        return turno.horario.fecha, turno.horario.hora
+
+    return turno.fecha, turno.hora
+
 @router.get("/panel-barbero")
 def panel_barbero(
     db: Session = Depends(get_db),
@@ -36,39 +42,46 @@ def panel_barbero(
     hoy = date.today()
 
     facturado_diario = sum(
-    t.precio
-    for t in turnos
-    if t.horario.fecha == hoy
+        t.precio
+        for t in turnos
+        if obtener_fecha_hora_turno(t)[0] == hoy
     )
 
     ganancia_diaria = sum(
         t.precio * 0.60
         for t in turnos
-        if t.horario.fecha == hoy
-    )
+        if obtener_fecha_hora_turno(t)[0] == hoy
+)
 
     facturado_mensual = sum(
         t.precio
         for t in turnos
-        if t.horario.fecha.month == hoy.month
-        and t.horario.fecha.year == hoy.year
+        if (
+            obtener_fecha_hora_turno(t)[0].month == hoy.month
+            and obtener_fecha_hora_turno(t)[0].year == hoy.year
+        )
     )
 
     ganancia_mensual = sum(
         t.precio * 0.60
         for t in turnos
-        if t.horario.fecha.month == hoy.month
-        and t.horario.fecha.year == hoy.year
-    )
+        if (
+         obtener_fecha_hora_turno(t)[0].month == hoy.month
+            and obtener_fecha_hora_turno(t)[0].year == hoy.year
+        )
+)
+    
+
     return {
+        
         "turnos": [
             {
                 "id": t.id,
                 "cliente": t.nombre,
                 "telefono": t.telefono,
-                "fecha": t.horario.fecha.isoformat(),
-                "hora": t.horario.hora.strftime("%H:%M"),
-                "horario_id": t.horario.id,
+                "fecha": (fh := obtener_fecha_hora_turno(t))[0].isoformat(),
+                "hora": fh[1].strftime("%H:%M"),
+                "horario_id": t.horario.id if t.horario else None,
                 "servicio": t.servicio.nombre,
                 "precio": t.precio,
                 "servicio_id": t.servicio_id,
@@ -108,31 +121,38 @@ def editar_turno(
 
         horario_actual = turno.horario
 
-        # 🔥 Si es el mismo horario, no hacer nada
-        if not (
-            horario_actual.fecha == data.fecha
-            and horario_actual.hora == nueva_hora
-        ):
+    # Si ya tiene horario y es el mismo, no hacer nada
+        if horario_actual:
+            if (
+                horario_actual.fecha == data.fecha
+                and horario_actual.hora == nueva_hora
+            ):
+                pass
+            else:
+                nuevo_horario = db.query(Horario).filter(
+                    Horario.fecha == data.fecha,
+                    Horario.hora == nueva_hora,
+                    Horario.barbero_id == user.id,
+                    Horario.disponible == True
+                ).first()
 
-            nuevo_horario = db.query(Horario).filter(
-                Horario.fecha == data.fecha,
-                Horario.hora == nueva_hora,
-                Horario.barbero_id == user.id,
-                Horario.disponible == True
-            ).first()
+                if not nuevo_horario:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Horario no disponible"
+                    )
 
-            if not nuevo_horario:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Horario no disponible"
-                )
+            # Liberar horario anterior
+                horario_actual.disponible = True
 
-            # Liberar anterior
-            horario_actual.disponible = True
+            # Ocupar el nuevo
+                nuevo_horario.disponible = False
+                turno.horario = nuevo_horario
 
-            # Asignar nuevo
-            nuevo_horario.disponible = False
-            turno.horario = nuevo_horario
+        else:
+        # Turno manual (sin horario asociado)
+            turno.fecha = data.fecha
+            turno.hora = nueva_hora
 
     # =========================
     # CAMBIO DE SERVICIO (OPCIONAL)
@@ -225,10 +245,8 @@ def cancelar_turno_barbero(
             detail="Turno no encontrado"
         )
 
-    horario = turno.horario
-
-    # liberar horario
-    horario.disponible = True
+    if turno.horario:
+        turno.horario.disponible = True
 
     db.delete(turno)
     db.commit()

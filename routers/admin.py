@@ -35,7 +35,7 @@ def ver_turnos(
             joinedload(Turno.servicio),
             joinedload(Turno.barbero)
         )
-        .order_by(Turno.fecha.desc(), Turno.hora.desc())
+        .order_by(Turno.fecha.asc(), Turno.hora.asc())
         .all()
     )
 
