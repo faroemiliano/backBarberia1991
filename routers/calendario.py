@@ -230,6 +230,7 @@ def preparar_servicios(db: Session = Depends(get_db)):
         {"nombre": "Barba", "precio": 13000},
         {"nombre": "Corte + Tintura", "precio": 800},
         {"nombre": "Corte + Barba + lavado", "precio": 20000},
+        {"nombre": "Corte Jubilados", "precio": 10000},
     ]
 
     creados = 0
