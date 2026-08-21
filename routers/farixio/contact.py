@@ -19,7 +19,7 @@ def contact(data: ContactForm):
     try:
         resend.Emails.send({
             "from": "Farixio <contacto@farixio.com>",
-            "to": ["faroemilianotech@gmail.com"],
+            "to": ["farixio.tech@gmail.com"],
             "subject": "Nuevo contacto desde Farixio",
             "html": f"""
                 <h2>Nuevo contacto</h2>
