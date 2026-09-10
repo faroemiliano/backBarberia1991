@@ -14,6 +14,10 @@ router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+class EstadoUsuario(BaseModel):
+    activo: bool
+
+
 # =========================
 # HELPER VALIDAR ADMIN
 # =========================
@@ -53,7 +57,8 @@ def listar_usuarios(db: Session = Depends(get_db)):
             "id": u.id,
             "email": u.email,
             "nombre": u.nombre,
-            "rol": u.rol.value
+            "rol": u.rol.value,
+            "activo": u.activo
         }
         for u in usuarios
     ]
@@ -76,6 +81,39 @@ def cambiar_rol(user_id: int, data: dict, db: Session = Depends(get_db)):
         generar_horarios_barbero(db, user)
 
     return {"msg": "Rol actualizado"}
+
+
+# =========================
+# INCLUIR / EXCLUIR DEL CONTEO ACTIVO
+# =========================
+@router.put("/usuarios/{user_id}/estado")
+def cambiar_estado_usuario(
+    user_id: int,
+    data: EstadoUsuario,
+    db: Session = Depends(get_db),
+    authorization: str = Header(...),
+):
+    get_admin_from_token(authorization, db)
+
+    user = db.query(Usuario).filter(Usuario.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if user.rol != RolEnum.cliente:
+        raise HTTPException(
+            status_code=400,
+            detail="Solo se puede cambiar el estado de clientes",
+        )
+
+    user.activo = data.activo
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "id": user.id,
+        "activo": user.activo,
+        "msg": "Estado actualizado",
+    }
 # =========================
 # VER TODOS LOS BARBEROS (ADMIN)
 # =========================

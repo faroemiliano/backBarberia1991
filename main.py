@@ -9,6 +9,7 @@ load_dotenv()
 print(os.getenv("ADMIN_EMAIL"))
 from database import engine
 from models import Base
+from sqlalchemy import inspect, text
 
 # Routers
 from routers import admin_barberos, auth, barbero_solo, calendario, admin, auth_google, admin_servicios, mis_turnos
@@ -28,6 +29,16 @@ if RESET_DB:
 print("📦 Creando tablas...")
 Base.metadata.create_all(bind=engine)
 print("✅ Tablas creadas")
+
+# Migración compatible con instalaciones existentes. create_all no agrega
+# columnas nuevas a tablas ya creadas.
+if "activo" not in {column["name"] for column in inspect(engine).get_columns("usuarios")}:
+    print("📦 Agregando estado activo a usuarios...")
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE usuarios ADD COLUMN activo BOOLEAN NOT NULL DEFAULT TRUE")
+        )
+    print("✅ Estado activo agregado")
 from services.agenda_service import generar_agenda_si_vacia
 
 @app.on_event("startup")

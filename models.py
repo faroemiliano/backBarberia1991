@@ -26,6 +26,9 @@ class Usuario(Base):
     password = Column(String, nullable=True)
     foto_url = Column(String, nullable=True)
     telefono = Column(String(30), nullable=True)
+    # Estado comercial: permite excluir clientes del conteo activo sin borrar
+    # su cuenta ni el historial de turnos.
+    activo = Column(Boolean, nullable=False, default=True, server_default=text("true"))
     
     rol = Column(
     Enum(RolEnum),
