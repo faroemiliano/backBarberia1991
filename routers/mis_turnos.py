@@ -29,6 +29,10 @@ def mis_turnos(
     if not user_id:
         raise HTTPException(status_code=401, detail="Token inválido")
 
+    usuario = db.query(Usuario).filter_by(id=user_id).first()
+    if not usuario or not usuario.activo:
+        raise HTTPException(status_code=403, detail="Esta cuenta está deshabilitada")
+
     turnos = (
         db.query(Turno)
         .join(Horario)
@@ -70,6 +74,10 @@ def cancelar_turno(
 
     if not user_id:
         raise HTTPException(status_code=401, detail="Token inválido")
+
+    usuario = db.query(Usuario).filter_by(id=user_id).first()
+    if not usuario or not usuario.activo:
+        raise HTTPException(status_code=403, detail="Esta cuenta está deshabilitada")
 
     # 🔥 TRAER CON USUARIO (CLAVE)
     turno = (
@@ -125,4 +133,3 @@ def cancelar_turno(
     db.commit()
 
     return {"ok": True, "mensaje": "Turno cancelado"}
-

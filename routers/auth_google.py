@@ -40,6 +40,9 @@ def login_google(payload: dict, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(user)
 
+        if not user.activo:
+            raise HTTPException(status_code=403, detail="Esta cuenta está deshabilitada")
+
         jwt = create_token({
             "user_id": user.id,
             "email": user.email,
@@ -60,6 +63,8 @@ def login_google(payload: dict, db: Session = Depends(get_db)):
             }
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         print("ERROR GOOGLE AUTH TYPE:", type(e))
         print("ERROR GOOGLE AUTH:", str(e))
