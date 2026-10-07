@@ -1,9 +1,10 @@
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from sqlalchemy.orm import Session
 from database import SesionLocal
-from models import Horario, RolEnum, Turno, Usuario, Servicio
+from models import AuditoriaServicio, Horario, RolEnum, Turno, Usuario, Servicio
+from auth.deps import admin_required
 from auth.security import decode_token
 from pydantic import BaseModel, Field
 from datetime import date, timedelta, time
@@ -16,6 +17,17 @@ from utils import horarios
 from utils.email import enviar_email_confirmacion
 
 router = APIRouter()
+
+
+@router.get("/servicios")
+def listar_servicios_publicos(db: Session = Depends(get_db)):
+    """Servicios activos disponibles para reservar, sin datos administrativos."""
+    return (
+        db.query(Servicio)
+        .filter(Servicio.activo.is_(True))
+        .order_by(Servicio.id)
+        .all()
+    )
 
 
 
@@ -87,7 +99,10 @@ def calendario(barbero_id: int, db: Session = Depends(get_db)):
 # GENERAR TODO EL AÑO (UNA SOLA VEZ)
 # --------------------------------------------------
 @router.post("/preparar-calendario")
-def preparar_calendario(db: Session = Depends(get_db)):
+def preparar_calendario(
+    db: Session = Depends(get_db),
+    _admin: Usuario = Depends(admin_required),
+):
 
     from datetime import datetime, timedelta
 
@@ -222,7 +237,11 @@ def preparar_calendario(db: Session = Depends(get_db)):
 # --------------------------------------------------
 
 @router.post("/preparar-servicios")
-def preparar_servicios(db: Session = Depends(get_db)):
+def preparar_servicios(
+    request: Request,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(admin_required),
+):
 
     servicios_base = [
         {"nombre": "Corte", "precio": 15000},
@@ -242,23 +261,53 @@ def preparar_servicios(db: Session = Depends(get_db)):
 
         # NO EXISTE → CREAR
         if not servicio:
-            db.add(Servicio(
+            servicio = Servicio(
                 nombre=s["nombre"],
                 precio=s["precio"],
                 activo=True
+            )
+            db.add(servicio)
+            db.flush()
+            db.add(AuditoriaServicio(
+                servicio_id=servicio.id,
+                admin_id=admin.id,
+                accion="preparar_servicios",
+                precio_anterior=None,
+                precio_nuevo=servicio.precio,
+                activo_anterior=None,
+                activo_nuevo=servicio.activo,
+                ip=request.client.host if request.client else None,
             ))
             creados += 1
             continue
+
+        precio_anterior = servicio.precio
+        activo_anterior = servicio.activo
+        cambio = False
 
         # EXISTE PERO ESTABA DESACTIVADO → REACTIVAR
         if not servicio.activo:
             servicio.activo = True
             reactivados += 1
+            cambio = True
 
         # EXISTE PERO CAMBIÓ PRECIO → ACTUALIZAR
         if servicio.precio != s["precio"]:
             servicio.precio = s["precio"]
             actualizados += 1
+            cambio = True
+
+        if cambio:
+            db.add(AuditoriaServicio(
+                servicio_id=servicio.id,
+                admin_id=admin.id,
+                accion="preparar_servicios",
+                precio_anterior=precio_anterior,
+                precio_nuevo=servicio.precio,
+                activo_anterior=activo_anterior,
+                activo_nuevo=servicio.activo,
+                ip=request.client.host if request.client else None,
+            ))
 
     db.commit()
 

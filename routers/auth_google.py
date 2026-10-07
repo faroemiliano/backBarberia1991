@@ -14,8 +14,6 @@ router = APIRouter()
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
 
-
-print("GOOGLE_CLIENT_ID:", GOOGLE_CLIENT_ID)
 @router.post("/auth/google")
 def login_google(payload: dict, db: Session = Depends(get_db)):
     try:

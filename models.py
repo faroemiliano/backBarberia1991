@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Boolean, Date, Time, ForeignKey, UniqueConstraint, Index, Float, Enum, text
+    Column, Integer, String, Boolean, Date, Time, DateTime, ForeignKey, UniqueConstraint, Index, Float, Enum, text, func
 )
 import enum
 from sqlalchemy.orm import relationship, declarative_base
@@ -118,6 +118,21 @@ class Servicio(Base):
 
     def __repr__(self):
         return f"<Servicio {self.nombre} ${self.precio}>"
+
+
+class AuditoriaServicio(Base):
+    __tablename__ = "auditoria_servicios"
+
+    id = Column(Integer, primary_key=True)
+    servicio_id = Column(Integer, ForeignKey("servicios.id", ondelete="SET NULL"), nullable=True, index=True)
+    admin_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    accion = Column(String(40), nullable=False)
+    precio_anterior = Column(Float, nullable=True)
+    precio_nuevo = Column(Float, nullable=True)
+    activo_anterior = Column(Boolean, nullable=True)
+    activo_nuevo = Column(Boolean, nullable=True)
+    ip = Column(String(64), nullable=True)
+    creado_en = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
 
 # ======================
 # TURNOS

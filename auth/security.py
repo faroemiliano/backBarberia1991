@@ -5,7 +5,6 @@ from fastapi import HTTPException
 import os
 
 SECRET_KEY = os.getenv("SECRET_KEY")
-print("SECRET_KEY usada:", SECRET_KEY)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 90
 
@@ -18,14 +17,12 @@ def verify_password(password: str, hashed: str) -> bool:
     return pwd_context.verify(password[:72], hashed)
 
 def create_token(data: dict):
-    print("CREANDO TOKEN con key:", SECRET_KEY)
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def decode_token(token: str):
-    print("DECODIFICANDO TOKEN con key:", SECRET_KEY)
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 

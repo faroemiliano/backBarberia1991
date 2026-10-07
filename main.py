@@ -6,7 +6,6 @@ from routers.farixio import contact
 import os
 
 load_dotenv()
-print(os.getenv("ADMIN_EMAIL"))
 from database import engine
 from models import Base
 from sqlalchemy import inspect, text

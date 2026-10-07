@@ -5,6 +5,7 @@ from sqlalchemy import func, extract
 from database import get_db
 from models import RolEnum, Usuario, Turno
 from auth.security import decode_token
+from auth.deps import admin_required
 from datetime import date
 from passlib.context import CryptContext
 
@@ -49,7 +50,10 @@ def get_admin_from_token(authorization: str, db: Session):
 # =========================
 
 @router.get("/usuarios")
-def listar_usuarios(db: Session = Depends(get_db)):
+def listar_usuarios(
+    db: Session = Depends(get_db),
+    _admin: Usuario = Depends(admin_required),
+):
     usuarios = db.query(Usuario).all()
 
     return [
@@ -66,7 +70,12 @@ def listar_usuarios(db: Session = Depends(get_db)):
 # CAMBIAR ROL DE LOS USUARIOS(ADMIN)
 # =========================
 @router.put("/cambiar-rol/{user_id}")
-def cambiar_rol(user_id: int, data: dict, db: Session = Depends(get_db)):
+def cambiar_rol(
+    user_id: int,
+    data: dict,
+    db: Session = Depends(get_db),
+    _admin: Usuario = Depends(admin_required),
+):
     user = db.query(Usuario).filter(Usuario.id == user_id).first()
 
     if not user:
