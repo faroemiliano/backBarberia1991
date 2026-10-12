@@ -40,7 +40,7 @@ def login_google(payload: dict, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(user)
 
-        if not user.activo:
+        if user.bloqueado:
             raise HTTPException(status_code=403, detail="Esta cuenta está deshabilitada")
 
         jwt = create_token({

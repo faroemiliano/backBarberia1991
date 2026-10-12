@@ -29,6 +29,9 @@ class Usuario(Base):
     # Estado comercial: permite excluir clientes del conteo activo sin borrar
     # su cuenta ni el historial de turnos.
     activo = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    # Seguridad: impide iniciar sesión o usar una sesión existente.
+    # Es independiente de ``activo``, que solo se usa para el conteo comercial.
+    bloqueado = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     
     rol = Column(
     Enum(RolEnum),

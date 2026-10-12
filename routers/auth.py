@@ -44,7 +44,7 @@ def acceso(data: UserLogin, db: Session = Depends(get_db)):
     if not user or not verify_password(data.password, user.password):
         raise HTTPException(401, "Credenciales incorrectas")
 
-    if not user.activo:
+    if user.bloqueado:
         raise HTTPException(403, "Esta cuenta está deshabilitada")
 
     token = create_token({

@@ -345,7 +345,7 @@ def reservar(
     if not usuario:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
-    if not usuario.activo:
+    if usuario.bloqueado:
         raise HTTPException(status_code=403, detail="Esta cuenta está deshabilitada")
 
     if usuario.rol != RolEnum.cliente:

@@ -38,6 +38,14 @@ if "activo" not in {column["name"] for column in inspect(engine).get_columns("us
             text("ALTER TABLE usuarios ADD COLUMN activo BOOLEAN NOT NULL DEFAULT TRUE")
         )
     print("✅ Estado activo agregado")
+
+if "bloqueado" not in {column["name"] for column in inspect(engine).get_columns("usuarios")}:
+    print("📦 Agregando estado de bloqueo a usuarios...")
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE usuarios ADD COLUMN bloqueado BOOLEAN NOT NULL DEFAULT FALSE")
+        )
+    print("✅ Estado de bloqueo agregado")
 from services.agenda_service import generar_agenda_si_vacia
 
 @app.on_event("startup")
