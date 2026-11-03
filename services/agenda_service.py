@@ -22,6 +22,8 @@ FRANJAS = {
 }
 
 INTERVALO = 40
+INTERVALO_EXCEPCION = 30
+FECHA_EXCEPCION_30 = date(2026, 11, 4)
 
 def dia_espanol(fecha: date):
     return DIAS[fecha.strftime("%A").lower()]
@@ -41,50 +43,75 @@ def horarios_base_esperados():
     return horarios
 
 
+def horarios_para_fecha(fecha: date):
+    intervalo = (
+        INTERVALO_EXCEPCION
+        if fecha == FECHA_EXCEPCION_30
+        else INTERVALO
+    )
+    horarios = []
+    for inicio, fin in FRANJAS.get(dia_espanol(fecha), []):
+        hora_actual = inicio
+        while hora_actual < fin:
+            horarios.append(hora_actual)
+            hora_actual = (
+                datetime.combine(fecha, hora_actual)
+                + timedelta(minutes=intervalo)
+            ).time()
+    return horarios
+
+
 def normalizar_agenda_a_40_minutos():
     """Migra una agenda previa de 30 minutos sin tocar turnos ni bloqueos."""
     db = SesionLocal()
     try:
+        hoy = date.today()
         esperados = set(horarios_base_esperados())
         actuales = {
             (base.dia_semana, base.hora)
             for base in db.query(HorarioBase).all()
         }
 
-        if actuales == esperados:
+        debe_aplicar_excepcion = hoy <= FECHA_EXCEPCION_30
+        bases_desactualizadas = actuales != esperados
+
+        if not bases_desactualizadas and not debe_aplicar_excepcion:
             return
 
-        hoy = date.today()
+        if bases_desactualizadas:
+            # Solo se reemplazan slots futuros disponibles. Los ocupados y
+            # bloqueados manualmente permanecen intactos.
+            db.query(Horario).filter(
+                Horario.fecha >= hoy,
+                Horario.disponible.is_(True),
+            ).delete(synchronize_session=False)
 
-        # Solo se reemplazan slots futuros disponibles. Los ocupados y los
-        # bloqueados manualmente permanecen intactos.
-        db.query(Horario).filter(
-            Horario.fecha >= hoy,
-            Horario.disponible.is_(True),
-        ).delete(synchronize_session=False)
-
-        db.query(HorarioBase).delete(synchronize_session=False)
-        db.add_all(
-            HorarioBase(dia_semana=dia, hora=hora)
-            for dia, hora in horarios_base_esperados()
-        )
-        db.commit()
+            db.query(HorarioBase).delete(synchronize_session=False)
+            db.add_all(
+                HorarioBase(dia_semana=dia, hora=hora)
+                for dia, hora in horarios_base_esperados()
+            )
+            db.commit()
+        elif debe_aplicar_excepcion:
+            # Si la grilla de 40 ya estaba creada, mañana se reemplazan solo
+            # los slots libres por una grilla temporal de 30 minutos.
+            db.query(Horario).filter(
+                Horario.fecha == FECHA_EXCEPCION_30,
+                Horario.disponible.is_(True),
+            ).delete(synchronize_session=False)
+            db.commit()
 
         barberos = db.query(Usuario).filter(
             Usuario.rol.in_([RolEnum.barbero, RolEnum.admin])
         ).all()
-        bases_por_dia = {}
-        for base in db.query(HorarioBase).all():
-            bases_por_dia.setdefault(base.dia_semana, []).append(base)
-
         nuevos = []
         for barbero in barberos:
             for i in range(365):
                 fecha = hoy + timedelta(days=i)
-                for base in bases_por_dia.get(dia_espanol(fecha), []):
+                for hora in horarios_para_fecha(fecha):
                     nuevos.append({
                         "fecha": fecha,
-                        "hora": base.hora,
+                        "hora": hora,
                         "disponible": True,
                         "barbero_id": barbero.id,
                     })
