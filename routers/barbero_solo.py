@@ -6,6 +6,7 @@ from datetime import date, datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from auth.deps import barbero_required, empleado_required
 from auth.security import decode_token
@@ -38,6 +39,30 @@ def panel_barbero(
     turnos = db.query(Turno).filter(
         Turno.barbero_id == user.id
     ).all()
+
+    conteos_por_usuario = dict(
+        db.query(Turno.usuario_id, func.count(Turno.id))
+        .filter(Turno.usuario_id.isnot(None))
+        .group_by(Turno.usuario_id)
+        .all()
+    )
+    conteos_por_telefono = dict(
+        db.query(Turno.telefono, func.count(Turno.id))
+        .filter(
+            Turno.usuario_id.is_(None),
+            Turno.telefono.isnot(None),
+            Turno.telefono != "",
+        )
+        .group_by(Turno.telefono)
+        .all()
+    )
+
+    def cantidad_cortes(turno: Turno) -> int:
+        if turno.usuario_id:
+            return conteos_por_usuario.get(turno.usuario_id, 1)
+        if turno.telefono:
+            return conteos_por_telefono.get(turno.telefono, 1)
+        return 1
 
     hoy = date.today()
 
@@ -86,6 +111,7 @@ def panel_barbero(
                 "precio": t.precio,
                 "servicio_id": t.servicio_id,
                 "barbero_id": t.barbero_id,
+                "cantidad_cortes": cantidad_cortes(t),
             }
             for t in turnos
         ],

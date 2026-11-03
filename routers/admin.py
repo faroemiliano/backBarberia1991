@@ -39,6 +39,30 @@ def ver_turnos(
         .all()
     )
 
+    conteos_por_usuario = dict(
+        db.query(Turno.usuario_id, func.count(Turno.id))
+        .filter(Turno.usuario_id.isnot(None))
+        .group_by(Turno.usuario_id)
+        .all()
+    )
+    conteos_por_telefono = dict(
+        db.query(Turno.telefono, func.count(Turno.id))
+        .filter(
+            Turno.usuario_id.is_(None),
+            Turno.telefono.isnot(None),
+            Turno.telefono != "",
+        )
+        .group_by(Turno.telefono)
+        .all()
+    )
+
+    def cantidad_cortes(turno: Turno) -> int:
+        if turno.usuario_id:
+            return conteos_por_usuario.get(turno.usuario_id, 1)
+        if turno.telefono:
+            return conteos_por_telefono.get(turno.telefono, 1)
+        return 1
+
     return [
         {
             "id": t.id,
@@ -51,6 +75,7 @@ def ver_turnos(
             "barbero": t.barbero.nombre if t.barbero else None,
             "barbero_id": t.barbero_id,
             "es_manual": t.es_manual,
+            "cantidad_cortes": cantidad_cortes(t),
         }
         for t in turnos
     ]
@@ -515,4 +540,3 @@ def resumen_mes(
         "ganancia_mes": total_mes,
         "dias": dias
     }
-
