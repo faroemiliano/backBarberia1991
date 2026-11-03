@@ -46,10 +46,11 @@ if "bloqueado" not in {column["name"] for column in inspect(engine).get_columns(
             text("ALTER TABLE usuarios ADD COLUMN bloqueado BOOLEAN NOT NULL DEFAULT FALSE")
         )
     print("✅ Estado de bloqueo agregado")
-from services.agenda_service import generar_agenda_si_vacia
+from services.agenda_service import generar_agenda_si_vacia, normalizar_agenda_a_40_minutos
 
 @app.on_event("startup")
 def startup_event():
+    normalizar_agenda_a_40_minutos()
     generar_agenda_si_vacia()
 
 # =====================

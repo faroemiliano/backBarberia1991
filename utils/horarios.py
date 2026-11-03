@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 from models import Usuario, Horario, HorarioBase, RolEnum
 
-INTERVALO = 30  # minutos
+INTERVALO = 40  # minutos
 
 DIAS = {
     "monday": "lunes",
