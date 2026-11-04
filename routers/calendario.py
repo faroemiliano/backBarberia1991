@@ -56,7 +56,8 @@ def calendario(barbero_id: int, db: Session = Depends(get_db)):
     # 🔎 Validar que el profesional exista (admin o barbero)
     profesional = db.query(Usuario).filter(
         Usuario.id == barbero_id,
-        Usuario.rol.in_([RolEnum.barbero, RolEnum.admin])
+        Usuario.rol.in_([RolEnum.barbero, RolEnum.admin]),
+        Usuario.acepta_reservas.is_(True),
     ).first()
 
     if not profesional:
@@ -366,6 +367,9 @@ def reservar(
         if not horario:
             raise HTTPException(400, "Horario no disponible")
 
+        if not horario.barbero.acepta_reservas:
+            raise HTTPException(400, "Este profesional no está disponible para reservas")
+
     # 4️⃣ Definir fecha y hora (CLAVE DEL FIX)
     if horario:
         fecha_turno = horario.fecha
@@ -453,10 +457,17 @@ def reservar(
     }
 
 @router.get("/profesionales")
-def obtener_profesionales(db: Session = Depends(get_db)):
-    profesionales = db.query(Usuario).filter(
+def obtener_profesionales(
+    solo_reservables: bool = False,
+    db: Session = Depends(get_db),
+):
+    consulta = db.query(Usuario).filter(
         Usuario.rol.in_([RolEnum.barbero, RolEnum.admin])
-    ).all()
+    )
+    if solo_reservables:
+        consulta = consulta.filter(Usuario.acepta_reservas.is_(True))
+
+    profesionales = consulta.all()
 
     return [
         {

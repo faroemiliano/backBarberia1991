@@ -46,6 +46,20 @@ if "bloqueado" not in {column["name"] for column in inspect(engine).get_columns(
             text("ALTER TABLE usuarios ADD COLUMN bloqueado BOOLEAN NOT NULL DEFAULT FALSE")
         )
     print("✅ Estado de bloqueo agregado")
+
+if "acepta_reservas" not in {column["name"] for column in inspect(engine).get_columns("usuarios")}:
+    print("📦 Agregando disponibilidad pública de profesionales...")
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE usuarios ADD COLUMN acepta_reservas BOOLEAN NOT NULL DEFAULT TRUE")
+        )
+        connection.execute(
+            text(
+                "UPDATE usuarios SET acepta_reservas = FALSE "
+                "WHERE nombre IN ('Emiliano Ezequiel Faro', 'Damian Pereyra')"
+            )
+        )
+    print("✅ Disponibilidad pública de profesionales agregada")
 from services.agenda_service import generar_agenda_si_vacia, normalizar_agenda_a_40_minutos
 
 @app.on_event("startup")

@@ -32,6 +32,9 @@ class Usuario(Base):
     # Seguridad: impide iniciar sesión o usar una sesión existente.
     # Es independiente de ``activo``, que solo se usa para el conteo comercial.
     bloqueado = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # Controla si el profesional aparece y puede recibir reservas públicas.
+    # No afecta su cuenta, calendario ni la gestión del administrador.
+    acepta_reservas = Column(Boolean, nullable=False, default=True, server_default=text("true"))
     
     rol = Column(
     Enum(RolEnum),
