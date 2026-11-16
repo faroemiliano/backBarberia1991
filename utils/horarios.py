@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
 from models import Usuario, Horario, RolEnum
-from services.agenda_service import horarios_para_fecha
+from services.agenda_service import horarios_para_barbero
 
 INTERVALO = 40  # minutos
 
@@ -25,7 +25,7 @@ def generar_horarios_barbero(db: Session, barbero: Usuario, dias_a_generar: int 
     hoy = date.today()
     for i in range(dias_a_generar):
         fecha = hoy + timedelta(days=i)
-        for hora in horarios_para_fecha(fecha):
+        for hora in horarios_para_barbero(fecha, barbero):
             exists = db.query(Horario).filter_by(
                 fecha=fecha, hora=hora, barbero_id=barbero.id
             ).first()
@@ -68,7 +68,7 @@ def reconstruir_horarios_disponibles_barbero(
 
     for i in range(dias_a_generar):
         fecha = hoy + timedelta(days=i)
-        for hora in horarios_para_fecha(fecha):
+        for hora in horarios_para_barbero(fecha, barbero):
             if (fecha, hora) in horarios_conservados:
                 continue
             db.add(Horario(

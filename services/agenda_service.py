@@ -24,6 +24,8 @@ FRANJAS = {
 INTERVALO = 40
 INTERVALO_EXCEPCION = 30
 FECHA_EXCEPCION_30 = date(2026, 11, 4)
+NOMBRE_DAMIAN = "Damian Pereyra"
+HORA_EXTRA_DAMIAN = time(20, 0)
 
 def dia_espanol(fecha: date):
     return DIAS[fecha.strftime("%A").lower()]
@@ -59,6 +61,58 @@ def horarios_para_fecha(fecha: date):
                 + timedelta(minutes=intervalo)
             ).time()
     return horarios
+
+
+def horarios_para_barbero(fecha: date, barbero: Usuario):
+    horarios = horarios_para_fecha(fecha)
+    if barbero.nombre == NOMBRE_DAMIAN and horarios:
+        return [*horarios, HORA_EXTRA_DAMIAN]
+    return horarios
+
+
+def asegurar_horario_extra_damian():
+    """Agrega el turno de las 20:00 a Damián en los días laborales."""
+    db = SesionLocal()
+    try:
+        damian = db.query(Usuario).filter(
+            Usuario.nombre == NOMBRE_DAMIAN,
+            Usuario.rol == RolEnum.barbero,
+        ).first()
+        if not damian:
+            return
+
+        hoy = date.today()
+        existentes = {
+            (fecha, hora)
+            for fecha, hora in db.query(Horario.fecha, Horario.hora)
+            .filter(
+                Horario.barbero_id == damian.id,
+                Horario.fecha >= hoy,
+            )
+            .all()
+        }
+        nuevos = []
+        for i in range(365):
+            fecha = hoy + timedelta(days=i)
+            if not horarios_para_fecha(fecha):
+                continue
+            if (fecha, HORA_EXTRA_DAMIAN) not in existentes:
+                nuevos.append({
+                    "fecha": fecha,
+                    "hora": HORA_EXTRA_DAMIAN,
+                    "disponible": True,
+                    "barbero_id": damian.id,
+                })
+
+        if nuevos:
+            stmt = insert(Horario).values(nuevos)
+            stmt = stmt.on_conflict_do_nothing(
+                index_elements=["fecha", "hora", "barbero_id"]
+            )
+            db.execute(stmt)
+            db.commit()
+    finally:
+        db.close()
 
 
 def normalizar_agenda_a_40_minutos():
@@ -108,7 +162,7 @@ def normalizar_agenda_a_40_minutos():
         for barbero in barberos:
             for i in range(365):
                 fecha = hoy + timedelta(days=i)
-                for hora in horarios_para_fecha(fecha):
+                for hora in horarios_para_barbero(fecha, barbero):
                     nuevos.append({
                         "fecha": fecha,
                         "hora": hora,
@@ -167,12 +221,10 @@ def generar_agenda_si_vacia():
     for barbero in barberos:
         for i in range(365):
             fecha = hoy + timedelta(days=i)
-            dia = dia_espanol(fecha)
-
-            for base in bases_por_dia.get(dia, []):
+            for hora in horarios_para_barbero(fecha, barbero):
                 nuevos.append({
                     "fecha": fecha,
-                    "hora": base.hora,
+                    "hora": hora,
                     "disponible": True,
                     "barbero_id": barbero.id
                 })

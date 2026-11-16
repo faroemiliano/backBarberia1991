@@ -60,12 +60,17 @@ if "acepta_reservas" not in {column["name"] for column in inspect(engine).get_co
             )
         )
     print("✅ Disponibilidad pública de profesionales agregada")
-from services.agenda_service import generar_agenda_si_vacia, normalizar_agenda_a_40_minutos
+from services.agenda_service import (
+    asegurar_horario_extra_damian,
+    generar_agenda_si_vacia,
+    normalizar_agenda_a_40_minutos,
+)
 
 @app.on_event("startup")
 def startup_event():
     normalizar_agenda_a_40_minutos()
     generar_agenda_si_vacia()
+    asegurar_horario_extra_damian()
 
 # =====================
 # OPENAPI / JWT
