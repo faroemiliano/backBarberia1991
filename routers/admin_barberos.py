@@ -19,6 +19,10 @@ class EstadoUsuario(BaseModel):
     activo: bool
 
 
+class EstadoReservasBarbero(BaseModel):
+    acepta_reservas: bool
+
+
 # =========================
 # HELPER VALIDAR ADMIN
 # =========================
@@ -62,7 +66,8 @@ def listar_usuarios(
             "email": u.email,
             "nombre": u.nombre,
             "rol": u.rol.value,
-            "activo": u.activo
+            "activo": u.activo,
+            "acepta_reservas": u.acepta_reservas,
         }
         for u in usuarios
     ]
@@ -122,6 +127,39 @@ def cambiar_estado_usuario(
         "id": user.id,
         "activo": user.activo,
         "msg": "Estado actualizado",
+    }
+
+
+@router.put("/barberos/{user_id}/reservas")
+def cambiar_disponibilidad_reservas(
+    user_id: int,
+    data: EstadoReservasBarbero,
+    db: Session = Depends(get_db),
+    _admin: Usuario = Depends(admin_required),
+):
+    barbero = db.query(Usuario).filter(Usuario.id == user_id).first()
+    if not barbero:
+        raise HTTPException(status_code=404, detail="Profesional no encontrado")
+
+    if barbero.rol not in [RolEnum.admin, RolEnum.barbero]:
+        raise HTTPException(
+            status_code=400,
+            detail="Solo se puede cambiar la disponibilidad de profesionales",
+        )
+
+    barbero.acepta_reservas = data.acepta_reservas
+    db.commit()
+
+    if barbero.acepta_reservas:
+        generar_horarios_barbero(db, barbero)
+
+    db.refresh(barbero)
+    return {
+        "id": barbero.id,
+        "acepta_reservas": barbero.acepta_reservas,
+        "msg": "Profesional habilitado para reservas"
+        if barbero.acepta_reservas
+        else "Profesional oculto de las reservas",
     }
 # =========================
 # VER TODOS LOS BARBEROS (ADMIN)
