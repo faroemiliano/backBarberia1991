@@ -9,7 +9,7 @@ from auth.deps import admin_required
 from datetime import date
 from passlib.context import CryptContext
 
-from utils.horarios import generar_horarios_barbero
+from utils.horarios import generar_horarios_barbero, reconstruir_horarios_disponibles_barbero
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -151,7 +151,7 @@ def cambiar_disponibilidad_reservas(
     db.commit()
 
     if barbero.acepta_reservas:
-        generar_horarios_barbero(db, barbero)
+        reconstruir_horarios_disponibles_barbero(db, barbero)
 
     db.refresh(barbero)
     return {
