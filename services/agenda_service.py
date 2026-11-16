@@ -76,7 +76,9 @@ def asegurar_horario_extra_damian():
     try:
         damian = db.query(Usuario).filter(
             Usuario.nombre == NOMBRE_DAMIAN,
-            Usuario.rol == RolEnum.barbero,
+            # Damián administra la barbería, por lo que su rol puede ser
+            # ``admin`` además de atender como profesional.
+            Usuario.rol.in_([RolEnum.barbero, RolEnum.admin]),
         ).first()
         if not damian:
             return
